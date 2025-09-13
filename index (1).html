@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>클릭커 광산</title>
+  <style>
+    :root{
+      --bg:#0f1220;--panel:#161a2e;--accent:#6ee7ff;--accent2:#a78bfa;--text:#eaf2ff;--muted:#9aa3b2;--danger:#ff6b6b;--ok:#22c55e;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Apple SD Gothic Neo, "Malgun Gothic", sans-serif; background:linear-gradient(180deg, #0b0e1a 0%, #0f1220 100%); color:var(--text);}
+    .app{max-width:520px;margin:0 auto;display:flex;flex-direction:column;min-height:100vh;}
+    header{position:sticky;top:0;z-index:10;background:rgba(15,18,32,0.9);backdrop-filter: blur(6px);border-bottom:1px solid #22263f}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:8px}
+    .stat{display:flex;align-items:center;gap:6px;background:var(--panel);padding:8px 10px;border-radius:12px;border:1px solid #232844;}
+    .stat b{font-weight:700}
+    .pill{font-size:12px;color:var(--muted)}
+    .btn{appearance:none;border:none;background:var(--accent2);color:#0b0e1a;border-radius:12px;padding:10px 14px;font-weight:700}
+    .btn.secondary{background:#243b55;color:#eaf2ff;border:1px solid #2f3a63}
+    .btn.danger{background:var(--danger);color:white}
+    .btn:disabled{opacity:.6}
+
+    /* Tabs */
+    .tabs{display:flex;gap:8px;padding:8px 12px;background:#0d1020;border-top:1px solid #22263f}
+    .tab-btn{flex:1;border:none;padding:10px 0;border-radius:12px;background:#1a2040;color:#b9c3ff;font-weight:700}
+    .tab-btn.active{background:var(--accent);color:#001018}
+
+    /* Grid area */
+    .screen{flex:1;display:flex;flex-direction:column;padding:10px 12px;gap:10px}
+    .timerbar{height:10px;background:#1b2342;border-radius:999px;overflow:hidden;border:1px solid #283058}
+    .timerbar > div{height:100%;background:linear-gradient(90deg, #22c55e, #facc15);width:100%}
+
+    .grid{display:grid;gap:6px;background:#0e1328;padding:6px;border-radius:16px;border:1px solid #202a51;}
+    /* 5x5 responsive square cells */
+    .grid{grid-template-columns:repeat(5,1fr)}
+    .cell{position:relative;background:#121737;border:1px solid #1f2752;border-radius:10px;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .cell .ore{position:absolute;inset:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#0a0e1e;text-shadow:0 1px 0 rgba(255,255,255,.2);}
+    .ore .name{font-size:12px;position:absolute;bottom:6px;left:6px;right:6px;text-align:center;color:#0a0e1e;mix-blend-mode: soft-light}
+    .hp{position:absolute;top:6px;left:6px;right:6px;height:8px;background:rgba(0,0,0,.35);border-radius:999px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .hp>div{height:100%;background:linear-gradient(90deg,#34d399,#f59e0b);width:100%}
+    .dmg{position:absolute;pointer-events:none;font-weight:900;animation:float .6s ease-out forwards}
+    @keyframes float{to{transform:translateY(-24px);opacity:0}}
+
+    .row{display:flex;gap:8px;align-items:center}
+    .panel{background:var(--panel);border:1px solid #232844;border-radius:16px;padding:12px}
+    .inventory{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .inv-item{background:#0f1430;border:1px solid #1f2853;border-radius:12px;padding:10px}
+    .inv-item h4{margin:0 0 6px 0}
+    .price{color:#a3e635;font-weight:800}
+    .small{font-size:12px;color:var(--muted)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace}
+    footer{padding:10px 12px}
+    .hint{font-size:12px;color:#94a3b8;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="topbar">
+        <div class="row">
+          <div class="stat"><span>💰 골드</span><b id="gold">0</b></div>
+          <div class="stat"><span>🗡️ 공격력</span><b id="atk">1</b></div>
+          <div class="stat pill"><span>🎯 치명타</span><b id="crit">10%</b></div>
+        </div>
+        <div class="row">
+          <button id="toggleRunBtn" class="btn">던전 입장</button>
+          <button id="exitBtn" class="btn danger" disabled>나가기</button>
+        </div>
+      </div>
+      <div class="timerbar"><div id="timeFill"></div></div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="dungeon">⛏️ 던전</button>
+        <button class="tab-btn" data-tab="inventory">🎒 인벤토리</button>
+        <button class="tab-btn" data-tab="upgrades">📈 업그레이드</button>
+        <button class="tab-btn" data-tab="settings">⚙️ 설정</button>
+      </div>
+    </header>
+
+    <main class="screen">
+      <section id="tab-dungeon" class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <div class="small">빈 칸에 일정 시간마다 광석이 솟아나요. 탭해서 캐세요!</div>
+          <div class="small mono">남은시간: <span id="timeLeft">--</span>s</div>
+        </div>
+        <div id="grid" class="grid"></div>
+      </section>
+
+      <section id="tab-inventory" class="panel" style="display:none">
+        <div class="row" style="justify-content:space-between;align-items:flex-end;margin-bottom:8px">
+          <h3 style="margin:0">🎒 인벤토리</h3>
+          <div class="small">던전에서 나가야 획득으로 확정돼요.</div>
+        </div>
+        <div class="inventory" id="inventoryList"></div>
+        <div class="row" style="margin-top:10px;justify-content:space-between">
+          <button id="sellAllBtn" class="btn secondary">전부 판매</button>
+          <div class="small">판매가는 광석별 가치 합계로 계산.</div>
+        </div>
+      </section>
+
+      <section id="tab-upgrades" class="panel" style="display:none">
+        <h3 style="margin:0 0 8px 0">📈 업그레이드</h3>
+        <div id="upgrades"></div>
+      </section>
+
+      <section id="tab-settings" class="panel" style="display:none">
+        <h3 style="margin:0 0 8px 0">⚙️ 설정 & 저장</h3>
+        <div class="row" style="flex-wrap:wrap;gap:10px">
+          <button id="saveBtn" class="btn secondary">수동 저장</button>
+          <button id="resetBtn" class="btn danger">초기화</button>
+        </div>
+        <p class="small" style="margin-top:8px">진행 상황은 자동/수동으로 브라우저에 저장돼요 (localStorage).</p>
+      </section>
+    </main>
+
+    <footer>
+      <p class="hint">팁: 광석을 빠르게 연타하면 더 빨리 캘 수 있어요. 치명타가 터지면 큰 피해!</p>
+    </footer>
+  </div>
+
+  <script>
+  (()=>{
+    const VERSION = 'miner_v1.0.0';
+
+    // ---------- Game State ----------
+    const state = {
+      player: { atk: 1, critChance: 0.10, critMult: 2.0, gold: 0 },
+      upgrades: {
+        atk: { level: 1, baseCost: 20, scale: 1.55 },
+        crit: { level: 0, baseCost: 50, scale: 1.7 },
+        spawn: { level: 0, baseCost: 80, scale: 1.8 },
+      },
+      inventory: { Copper:0, Iron:0, Silver:0, Gold:0, Gem:0 },
+      loot:      { Copper:0, Iron:0, Silver:0, Gold:0, Gem:0 }, // current run (unbanked)
+      grid: new Array(25).fill(null),
+      inRun:false,
+      runTimeMax: 60,
+      timeLeft: 0,
+      timers: { spawn:null, tick:null },
+    };
+
+    const ORES = [
+      { key:'Copper', name:'구리',   color:'#ef9a9a', hp: 10, value: 2, weight: 36 },
+      { key:'Iron',   name:'철',     color:'#90caf9', hp: 20, value: 5, weight: 28 },
+      { key:'Silver', name:'은',     color:'#cfd8dc', hp: 35, value:12, weight: 18 },
+      { key:'Gold',   name:'금',     color:'#f6e05e', hp: 60, value:25, weight: 12 },
+      { key:'Gem',    name:'보석',   color:'#b39ddb', hp:100, value:60, weight: 6  },
+    ];
+
+    // ---------- Helpers ----------
+    const $ = sel => document.querySelector(sel);
+    const gridEl = $('#grid');
+
+    function save(){
+      localStorage.setItem(VERSION, JSON.stringify(state));
+    }
+    function load(){
+      const raw = localStorage.getItem(VERSION);
+      if(!raw) return;
+      try{
+        const s = JSON.parse(raw);
+        Object.assign(state, s);
+      }catch(e){console.warn('load failed', e)}
+    }
+
+    function randWeighted(items){
+      const total = items.reduce((a,b)=>a+b.weight,0);
+      let r = Math.random()*total;
+      for(const it of items){
+        if((r-=it.weight) <= 0) return it;
+      }
+      return items[0];
+    }
+
+    function cellIndexFromEvent(e){
+      const cell = e.target.closest('.cell');
+      if(!cell) return -1;
+      return +cell.dataset.idx;
+    }
+
+    // ---------- UI Rendering ----------
+    function renderTop(){
+      $('#gold').textContent = state.player.gold.toLocaleString();
+      $('#atk').textContent = state.player.atk.toString();
+      $('#crit').textContent = Math.round(state.player.critChance*100)+"%";
+      $('#timeLeft').textContent = state.inRun? state.timeLeft : '--';
+      $('#exitBtn').disabled = !state.inRun;
+      $('#toggleRunBtn').textContent = state.inRun? '진행 중' : '던전 입장';
+      $('#toggleRunBtn').disabled = state.inRun;
+      const fill = Math.max(0, Math.min(1, state.timeLeft / state.runTimeMax));
+      $('#timeFill').style.width = (fill*100)+'%';
+    }
+
+    function renderGrid(){
+      if(!gridEl.childElementCount){
+        for(let i=0;i<25;i++){
+          const d = document.createElement('div');
+          d.className='cell';
+          d.dataset.idx=i;
+          gridEl.appendChild(d);
+        }
+      }
+      state.grid.forEach((ore, i)=>{
+        const c = gridEl.children[i];
+        c.innerHTML = '';
+        if(ore){
+          const el = document.createElement('div');
+          el.className='ore';
+          el.style.background = ore.bg;
+          const name = document.createElement('div');
+          name.className='name';
+          name.textContent = ore.label;
+          const hp = document.createElement('div');
+          hp.className='hp';
+          const hpfill = document.createElement('div');
+          hp.appendChild(hpfill);
+          const ratio = Math.max(0, Math.min(1, ore.hp/ore.maxHp));
+          hpfill.style.width = (ratio*100)+'%';
+          el.appendChild(name);
+          c.appendChild(el);
+          c.appendChild(hp);
+        }
+      });
+    }
+
+    function renderInventory(){
+      const box = $('#inventoryList');
+      box.innerHTML='';
+      for(const t of ORES){
+        const inv = state.inventory[t.key]||0;
+        const li = document.createElement('div');
+        li.className='inv-item';
+        li.innerHTML = `<h4>${t.name} <span class="small">(${t.key})</span></h4>
+          <div class="small">가치: <span class="price">${t.value}</span> 골드 / 1개</div>
+          <div style="margin-top:6px" class="row"><div class="stat">보유: <b>${inv}</b></div>
+          <button class="btn secondary" data-sell="${t.key}">1개 판매</button></div>`;
+        box.appendChild(li);
+      }
+      box.querySelectorAll('[data-sell]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const k = btn.dataset.sell; const t = ORES.find(o=>o.key===k);
+          if(state.inventory[k]>0){ state.inventory[k]--; state.player.gold+=t.value; save(); refresh(); }
+        });
+      });
+    }
+
+    function renderUpgrades(){
+      const cont = $('#upgrades');
+      cont.innerHTML='';
+      // atk
+      const atkCost = Math.floor(state.upgrades.atk.baseCost * Math.pow(state.upgrades.atk.scale, state.upgrades.atk.level-1));
+      cont.appendChild(upgradeCard('🗡️ 공격력', `현재: ${state.player.atk}`, atkCost, ()=>{
+        if(spend(atkCost)){ state.upgrades.atk.level++; state.player.atk += 1; toast('공격력 +1'); save(); refresh(); }
+      }));
+
+      // crit chance
+      const critCost = Math.floor(state.upgrades.crit.baseCost * Math.pow(state.upgrades.crit.scale, state.upgrades.crit.level));
+      cont.appendChild(upgradeCard('🎯 치명타 확률', `현재: ${(state.player.critChance*100).toFixed(1)}%`, critCost, ()=>{
+        if(state.player.critChance >= 0.5){ toast('최대 50%'); return; }
+        if(spend(critCost)){ state.upgrades.crit.level++; state.player.critChance += 0.02; toast('치명타 확률 +2%'); save(); refresh(); }
+      }));
+
+      // spawn speed (reduces interval)
+      const spawnCost = Math.floor(state.upgrades.spawn.baseCost * Math.pow(state.upgrades.spawn.scale, state.upgrades.spawn.level));
+      cont.appendChild(upgradeCard('⏱️ 스폰 속도', `레벨: ${state.upgrades.spawn.level}`, spawnCost, ()=>{
+        if(spend(spawnCost)){ state.upgrades.spawn.level++; toast('스폰 속도 업'); if(state.inRun) restartSpawnTimer(); save(); refresh(); }
+      }));
+    }
+
+    function upgradeCard(title, desc, cost, onBuy){
+      const wrap = document.createElement('div');
+      wrap.className='inv-item';
+      wrap.innerHTML = `<h4 style="margin:0 0 4px 0">${title}</h4>
+        <div class="small">${desc}</div>
+        <div class="row" style="margin-top:8px;justify-content:space-between">
+          <div class="row"><span>가격:</span> <b class="price">${cost}</b></div>
+          <button class="btn">구매</button>
+        </div>`;
+      wrap.querySelector('.btn').addEventListener('click', onBuy);
+      return wrap;
+    }
+
+    function spend(amount){
+      if(state.player.gold < amount){ toast('골드가 부족해요'); return false; }
+      state.player.gold -= amount; return true;
+    }
+
+    function toast(msg){
+      const t = document.createElement('div');
+      t.textContent = msg; t.style.position='fixed'; t.style.left='50%'; t.style.top='14%'; t.style.transform='translateX(-50%)';
+      t.style.background='#11193a'; t.style.border='1px solid #263165'; t.style.padding='10px 14px'; t.style.borderRadius='12px'; t.style.color='#eaf2ff'; t.style.zIndex=9999;
+      document.body.appendChild(t); setTimeout(()=>t.remove(), 1100);
+    }
+
+    function refresh(){
+      renderTop(); renderGrid(); renderInventory(); renderUpgrades();
+    }
+
+    // ---------- Dungeon Loop ----------
+    function startRun(){
+      if(state.inRun) return;
+      state.inRun = true; state.timeLeft = state.runTimeMax; state.loot = { Copper:0, Iron:0, Silver:0, Gold:0, Gem:0 };
+      // clear grid
+      state.grid = new Array(25).fill(null);
+      restartSpawnTimer();
+      state.timers.tick && clearInterval(state.timers.tick);
+      state.timers.tick = setInterval(()=>{
+        if(!state.inRun) return; 
+        state.timeLeft--; if(state.timeLeft<=0){
+          bankAndExit();
+        }
+        renderTop();
+      }, 1000);
+      refresh();
+    }
+
+    function restartSpawnTimer(){
+      const baseMs = 2200; // base 2.2s
+      const level = state.upgrades.spawn.level; // each level -6% interval (cap)
+      let interval = baseMs * Math.pow(0.94, level);
+      if(interval < 600) interval = 600;
+      state.timers.spawn && clearInterval(state.timers.spawn);
+      state.timers.spawn = setInterval(spawnOre, interval);
+    }
+
+    function exitRun(){
+      if(!state.inRun) return; bankAndExit();
+    }
+
+    function bankAndExit(){
+      // move loot to inventory
+      for(const k in state.loot){ state.inventory[k] = (state.inventory[k]||0) + state.loot[k]; }
+      state.loot = { Copper:0, Iron:0, Silver:0, Gold:0, Gem:0 };
+      state.inRun=false; state.timeLeft=0;
+      clearInterval(state.timers.spawn); clearInterval(state.timers.tick);
+      toast('던전을 떠났습니다! 인벤토리에 추가됨');
+      save(); refresh();
+    }
+
+    function spawnOre(){
+      const empties = state.grid.map((v,i)=> v? null : i).filter(v=>v!==null);
+      if(empties.length===0) return;
+      const idx = empties[Math.floor(Math.random()*empties.length)];
+      const t = randWeighted(ORES);
+      state.grid[idx] = { type: t.key, label: t.name, hp: t.hp, maxHp: t.hp, value: t.value, bg: t.color };
+      renderGrid();
+    }
+
+    function hit(idx){
+      if(!state.inRun) return;
+      const ore = state.grid[idx]; if(!ore) return;
+      let dmg = state.player.atk;
+      if(Math.random() < state.player.critChance) dmg = Math.floor(dmg * state.player.critMult);
+      ore.hp -= dmg;
+      // floating text
+      const cell = gridEl.children[idx];
+      const dm = document.createElement('div'); dm.className='dmg'; dm.textContent = '-' + dmg; dm.style.left='50%'; dm.style.top='38%'; dm.style.transform='translateX(-50%)';
+      cell.appendChild(dm); setTimeout(()=>dm.remove(), 620);
+      if(ore.hp <= 0){
+        // collect to current run loot
+        state.loot[ore.type] = (state.loot[ore.type]||0)+1;
+        state.grid[idx] = null;
+      }
+      renderGrid();
+    }
+
+    // ---------- Inventory actions ----------
+    function sellAll(){
+      let total=0; for(const t of ORES){ const n = state.inventory[t.key]||0; total += n*t.value; state.inventory[t.key]=0; }
+      state.player.gold += total; toast(`전부 판매: +${total}골드`); save(); refresh();
+    }
+
+    // ---------- Tabs ----------
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const t = btn.dataset.tab;
+        ['dungeon','inventory','upgrades','settings'].forEach(id=>{
+          document.querySelector('#tab-'+id).style.display = (id===t? 'block':'none');
+        })
+      })
+    });
+
+    // ---------- Events ----------
+    gridEl.addEventListener('click', (e)=>{
+      const idx = cellIndexFromEvent(e); if(idx>=0) hit(idx);
+    });
+    $('#toggleRunBtn').addEventListener('click', startRun);
+    $('#exitBtn').addEventListener('click', exitRun);
+    $('#sellAllBtn').addEventListener('click', sellAll);
+    $('#saveBtn').addEventListener('click', ()=>{ save(); toast('저장 완료'); });
+    $('#resetBtn').addEventListener('click', ()=>{
+      if(confirm('정말 초기화할까요? 모든 진행이 사라집니다.')){ localStorage.removeItem(VERSION); location.reload(); }
+    });
+
+    // ---------- Boot ----------
+    function boot(){
+      load();
+      renderGrid(); renderInventory(); renderUpgrades(); renderTop();
+    }
+    boot();
+  })();
+  </script>
+</body>
+</html>
