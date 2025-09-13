@@ -39,7 +39,7 @@
     .ore .name{display:none}
     .hp{position:absolute;top:6px;left:6px;right:6px;height:8px;background:rgba(0,0,0,.35);border-radius:999px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .hp>div{height:100%;background:linear-gradient(90deg,#34d399,#f59e0b);width:100%}
-    .dmg{position:absolute;pointer-events:none;font-weight:900;animation:float .6s ease-out forwards}
+    .dmg{position:absolute;pointer-events:none;font-weight:900;animation:float .6s ease-out forwards;white-space:nowrap}
     @keyframes float{to{transform:translateY(-24px);opacity:0}}
 
     .pet{position:absolute;width:16px;height:16px;border-radius:50%;background:#22d3ee;border:2px solid #0e7490;box-shadow:0 0 10px rgba(34,211,238,.6)}
@@ -49,7 +49,7 @@
     .panel{background:var(--panel);border:1px solid #232844;border-radius:16px;padding:12px}
 
     .inventory{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-    .inv-actions{display:flex;justify-content:flex-end;margin-bottom:8px}
+    .inv-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
     .inv-item{background:#0f1430;border:1px solid #1f2853;border-radius:12px;padding:10px}
     .inv-item h4{margin:0 0 6px 0}
     .price{color:#a3e635;font-weight:800}
@@ -62,7 +62,13 @@
     .skillbtn.cd{position:relative}
     .skillbtn.cd::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.35);}
     .slotlist{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
-    .slot{background:#0c1230;border:1px dashed #27408b;border-radius:10px;min-height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .slot{background:#0c1230;border:1px dashed #27408b;border-radius:10px;min-height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer; font-size:12px; white-space:nowrap}
+
+    /* Aether */
+    .aether-grid{display:grid;grid-template-columns:1fr;gap:10px}
+    .ae-card{background:#0f1430;border:1px solid #53338f;border-radius:12px;padding:10px}
+    .ae-card h4{margin:0 0 6px 0}
+    .ae-meta{color:#c4b5fd}
 
     footer{padding:8px 0}
   </style>
@@ -86,6 +92,7 @@
         <button class="tab-btn" data-tab="inventory">🎒 인벤토리</button>
         <button class="tab-btn" data-tab="upgrades">📈 업그레이드</button>
         <button class="tab-btn" data-tab="skills">🪄 스킬</button>
+        <button class="tab-btn" data-tab="aether">🔮 에테르</button>
         <button class="tab-btn" data-tab="settings">⚙️ 설정</button>
       </div>
     </header>
@@ -103,6 +110,10 @@
 
       <section id="tab-inventory" class="panel" style="display:none">
         <div class="inv-actions">
+          <div class="row" style="gap:8px">
+            <input type="checkbox" id="autoSellChkInv" style="width:18px;height:18px">
+            <label for="autoSellChkInv" class="mono">광석 자동판매</label>
+          </div>
           <button id="sellAllGlobal" class="btn secondary">모든 광물 판매</button>
         </div>
         <div class="inventory" id="inventoryList"></div>
@@ -114,14 +125,42 @@
 
       <section id="tab-skills" class="panel" style="display:none">
         <div class="row" style="justify-content:space-between;align-items:flex-end">
-          <div class="mono"></div>
-          <div class="row"><span>액티브 슬롯:</span> <b id="slotCount">0/5</b></div>
+          <div class="row"><span>액티브 슬롯:</span> <b id="slotCount" class="mono">0/5</b></div>
         </div>
         <div class="slotlist" id="slotList"></div>
         <h4 style="margin:10px 0 6px 0">액티브 스킬 상점</h4>
         <div class="skillshop" id="skillShopActive"></div>
         <h4 style="margin:14px 0 6px 0">패시브 스킬 상점</h4>
         <div class="skillshop" id="skillShopPassive"></div>
+      </section>
+
+      <section id="tab-aether" class="panel" style="display:none">
+        <div class="row" style="justify-content:space-between">
+          <div class="mono">에테르: <b id="aeBalance">0</b></div>
+          <div class="mono">환생: <b id="rebirths">0회</b></div>
+        </div>
+        <div class="ae-card">
+          <h4>환생 준비</h4>
+          <div class="ae-meta">지하 20층 이상에서 환생 가능. 아래 보너스를 이번 환생에 함께 구매할 수 있습니다.</div>
+          <div id="rebirthPerks" class="aether-grid" style="margin-top:8px"></div>
+          <div class="row" style="justify-content:space-between;margin-top:8px">
+            <div class="mono">총 비용: <b id="rebirthTotal">0</b> 에테르</div>
+            <button id="rebirthBuyBtn" class="btn danger" disabled>보너스 구매 + 환생</button>
+          </div>
+        </div>
+        <div class="ae-card">
+          <h4>자동 이동</h4>
+          <div class="row" style="justify-content:space-between;flex-wrap:wrap">
+            <div class="ae-meta">보스(에테르) 처치 시 다음 층으로 자동 입장</div>
+            <div class="row">
+              <input type="checkbox" id="autoAdvanceChk" style="width:18px;height:18px" disabled>
+              <label for="autoAdvanceChk" class="mono" style="margin-left:6px">활성화</label>
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button id="autoAdvanceBuyBtn" class="btn" disabled>에테르 150 소모 후 해금</button>
+          </div>
+        </div>
       </section>
 
       <section id="tab-settings" class="panel" style="display:none">
@@ -139,9 +178,9 @@
 
   <script>
   (()=>{
-    const VERSION = 'miner_v1.8.1';
+    const VERSION = 'miner_v2.4.0';
 
-    // ---------- Audio (simple SFX) ----------
+    // ---------- Audio ----------
     let audioCtx = null, sfxEnabled = true;
     function ensureAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
     function beep(freq=600, dur=0.06, type='square', gain=0.03){
@@ -165,24 +204,33 @@
       ui(){ beep(430,0.05,'triangle',0.035); }
     };
 
+    // ---------- ATK scaling ----------
+    const ATK_RATE = 0.03; // multiplicative per (level-1)^2
+    function calcAtk() {
+      const lvl = state.upgrades.atk?.level || 1;
+      const base = state.player.atkBase || 1;
+      const mul = Math.pow(1 + ATK_RATE, Math.max(0, (lvl-1)*(lvl-1)));
+      return Math.max(1, Math.floor(base * mul));
+    }
+
     // ---------- Game State ----------
     const state = {
-      player: { atk: 1, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
+      player: { atkBase: 1, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
       upgrades: {
         atk:   { level: 1, baseCost: 20,  scale: 1.55 },
         crit:  { level: 0, baseCost: 50,  scale: 1.7  },
-        spawn: { level: 0, baseCost: 80,  scale: 1.8  }, // 생성 속도
+        spawn: { level: 0, baseCost: 80,  scale: 1.8  },
         pet:   { level: 0, baseCost: 150, scale: 2.0  },
         oreMul: {}
       },
+      aether: { luck:0, petPlus:0, etherHaste:0, rebirths:0, autoAdvanceOwned:false, autoAdvanceEnabled:false },
+
       floor: 1,
       highestFloor: 1,
       inventory: {},
       loot: {},
       grid: new Array(25).fill(null),
       inRun:false,
-      runTimeBase: 20.0,
-      runTimeCap: 20.0,
       timeLeft: 0.0,
       timers: { spawn:null, tick:null },
       pets: [],
@@ -192,16 +240,43 @@
       etherSpawned: false,
 
       // Skills
-      skillsOwnedActive: {},   // {key:true}
-      skillsOwnedPassive: {},  // {key:true}
-      skillSlots: [null,null,null,null,null], // 5
-      skillCooldowns: {},      // {key: remainingSec}
+      skillsOwnedActive: {},
+      skillsOwnedPassive: {},
+      skillSlots: [null,null,null,null,null],
+      skillCooldowns: {},
       skillHasteUntil: 0,
       skillAtkBuffUntil: 0,
 
       // Passive bonuses
-      passive: { sellBonus: 0, petPlus: 0 }
+      passive: { sellBonus: 0, petPlus: 0 },
+
+      // Settings
+      settings: { autoSell:false }
     };
+
+    // ---------- Skills ----------
+    const ACTIVE_SKILLS = [
+      { key:'berserk',  name:'광폭화',   desc:'5초간 공격력 x2',         ae:150, cd:20 },
+      { key:'timewarp', name:'타임워프', desc:'시간 +3초(최대 20초)',    ae:120, cd:25 },
+      { key:'meteor',   name:'운석 낙하', desc:'모든 광석에 큰 피해',    ae:200, cd:30 },
+      { key:'haste',    name:'가속',     desc:'5초간 생성 속도 2배',     ae:140, cd:25 },
+      { key:'sonic',    name:'초음파',   desc:'가까운 광석에 즉시 큰 피해', ae:130, cd:18 },
+    ];
+    const PASSIVE_SKILLS = [
+      { key:'power',   name:'강화 채굴',  desc:'공격력 +1(기초)',            ae:120, once:true,  apply(){ state.player.atkBase = (state.player.atkBase||1) + 1; } },
+      { key:'sharp',   name:'예리함',    desc:'치명타 확률 +3% (최대 50%)',   ae:150, once:true,  apply(){ state.player.critChance = Math.min(0.5, state.player.critChance + 0.03); } },
+      { key:'merchant',name:'상인 감각',  desc:'판매가 +10%',                 ae:180, once:false, apply(){ state.passive.sellBonus += 0.10; } },
+      { key:'petmaster',name:'펫 조련',  desc:'펫 +1',                      ae:200, once:false, apply(){ state.passive.petPlus += 1; if(state.inRun) spawnPets(); } },
+    ];
+
+    // ---------- Rebirth-only Aether ----------
+    const REBIRTH_PERKS = [
+      { key:'luck',        name:'행운 촉매',   desc:'희귀 광물 가중치 상승', base:25, scale:1.6, max:20, get lvl(){ return state.aether.luck||0; },      apply(){ state.aether.luck=(state.aether.luck||0)+1; } },
+      { key:'petPlus',     name:'차원 펫',     desc:'특별 펫 +1',            base:40, scale:1.8, max:5,  get lvl(){ return state.aether.petPlus||0; },   apply(){ state.aether.petPlus=(state.aether.petPlus||0)+1; } },
+      { key:'etherHaste',  name:'에테르 공명', desc:'에테르 등장 -1초(최소 5초)', base:30, scale:1.6, max:10, get lvl(){ return state.aether.etherHaste||0; }, apply(){ state.aether.etherHaste=(state.aether.etherHaste||0)+1; } },
+    ];
+    function perkCost(p){ return Math.floor(p.base * Math.pow(p.scale, p.lvl)); }
+    const rebirthPick = {}; // {key:1}
 
     // ---------- Ores ----------
     const ORES = [
@@ -218,21 +293,6 @@
       { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:300, value:180, weight: 2,  tier:6, minFloor:22 },
     ];
 
-    // ---------- Skills Catalog ----------
-    const ACTIVE_SKILLS = [
-      { key:'berserk',  name:'광폭화', desc:'5초간 공격력 x2', gold:150, cd:20 },
-      { key:'timewarp', name:'타임워프', desc:'시간 +3초(최대 20초)', gold:120, cd:25 },
-      { key:'meteor',   name:'운석 낙하', desc:'모든 광석에 큰 피해', gold:200, cd:30 },
-      { key:'haste',    name:'가속', desc:'5초간 생성 속도 2배', gold:140, cd:25 },
-      { key:'sonic',    name:'초음파', desc:'가까운 광석에 즉시 큰 피해', gold:130, cd:18 },
-    ];
-    const PASSIVE_SKILLS = [
-      { key:'power',   name:'강화 채굴',  desc:'공격력 +1', gold:120, once:true, apply(){ state.player.atk += 1; } },
-      { key:'sharp',   name:'예리함',    desc:'치명타 확률 +3% (최대 50%)', gold:150, once:true, apply(){ state.player.critChance = Math.min(0.5, state.player.critChance + 0.03); } },
-      { key:'merchant',name:'상인 감각',  desc:'판매가 +10%', gold:180, once:false, apply(){ state.passive.sellBonus += 0.10; } },
-      { key:'petmaster',name:'펫 조련',  desc:'펫 +1', gold:200, once:false, apply(){ state.passive.petPlus += 1; if(state.inRun) spawnPets(); } },
-    ];
-
     // init inventories
     for(const o of ORES){ state.inventory[o.key]=state.inventory[o.key]||0; state.loot[o.key]=0; state.upgrades.oreMul[o.key]=state.upgrades.oreMul[o.key]||0; }
 
@@ -247,7 +307,7 @@
       localStorage.setItem(VERSION, JSON.stringify({
         player:state.player, upgrades:state.upgrades, floor:state.floor, highestFloor:state.highestFloor,
         inventory:state.inventory, skillsOwnedActive:state.skillsOwnedActive, skillsOwnedPassive:state.skillsOwnedPassive,
-        skillSlots:state.skillSlots, passive:state.passive
+        skillSlots:state.skillSlots, passive:state.passive, aether:state.aether, settings:state.settings
       }));
     }
     function load(){
@@ -262,11 +322,25 @@
         state.skillsOwnedPassive=s.skillsOwnedPassive||{};
         state.skillSlots=s.skillSlots||[null,null,null,null,null];
         state.passive=s.passive||state.passive;
+        state.aether = s.aether || state.aether;
+        state.settings = s.settings || state.settings;
+        // migrate atkBase if missing (legacy)
+        if(typeof state.player.atkBase === 'undefined'){
+          state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 1;
+        }
       }catch(e){}
     }
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
-    function eligibleOresForFloor(f){ return ORES.filter(o=> f >= o.minFloor).map(o=>{ const bonus = Math.max(0, f - o.minFloor); const tierBoost = 1 + (o.tier-1)*0.03*bonus; return { ...o, weight: Math.max(1, Math.round(o.weight * tierBoost)) }; }); }
+    function eligibleOresForFloor(f){
+      const luck = state.aether?.luck||0;
+      return ORES.filter(o=> f >= o.minFloor).map(o=>{
+        const bonus = Math.max(0, f - o.minFloor);
+        const tierBoost = 1 + (o.tier-1)*0.03*bonus;
+        const rareMul = 1 + luck*0.08*(o.tier-1);
+        return { ...o, weight: Math.max(1, Math.round(o.weight * tierBoost * rareMul)) };
+      });
+    }
     function cellIndexFromPoint(x,y){ const el = document.elementFromPoint(x,y); const cell = el && el.closest ? el.closest('.cell') : null; return cell? +cell.dataset.idx : -1; }
     function gridRect(){ return gridEl.getBoundingClientRect(); }
     function cellRect(idx){ return gridEl.children[idx].getBoundingClientRect(); }
@@ -284,7 +358,7 @@
     function fmtFloor(n){ return `지하 ${n}층`; }
     function renderHud(){
       $('#hud1').textContent = `💰 ${state.player.gold} · ✨ ${state.player.ether}`;
-      $('#hud2').textContent = `🗡️ ${state.player.atk} · 🗼 ${fmtFloor(state.floor)}`;
+      $('#hud2').textContent = `🗡️ ${calcAtk()} · 🗼 ${fmtFloor(state.floor)}`;
     }
     function renderTop(){
       renderHud();
@@ -292,7 +366,7 @@
       $('#exitBtn').disabled = !state.inRun;
       $('#toggleRunBtn').textContent = state.inRun? '진행 중' : '던전 도전';
       $('#toggleRunBtn').disabled = state.inRun;
-      const max = state.runTimeCap;
+      const max = 20;
       const fill = state.inRun? Math.max(0, Math.min(1, state.timeLeft / max)) : 1;
       document.getElementById('timeFill').style.width = (fill*100)+'%';
       const isDungeonVisible = document.querySelector('#tab-dungeon').style.display !== 'none';
@@ -303,7 +377,9 @@
       state.grid.forEach((ore, i)=>{ const c = gridEl.children[i]; c.innerHTML=''; if(ore){ const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; c.appendChild(el); c.appendChild(hp);} });
       renderPets(); }
 
-    function renderInventory(){ const box=$('#inventoryList'); box.innerHTML=''; for(const t of ORES){ const inv = state.inventory[t.key]||0; const mul=sellMultiplier(t.key); const li=document.createElement('div'); li.className='inv-item'; li.innerHTML = `<h4>${t.name} <span class="small">(${t.key})</span></h4><div>가치: <span class="price">${Math.round(t.value*mul)}</span> 골드</div><div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap"><button class="btn secondary" data-sellall="${t.key}">모두 판매</button><button class="btn secondary" data-sell="${t.key}">1개 판매</button><button class="btn" data-upg-ore="${t.key}">업그레이드</button></div><div class="row" style="margin-top:6px"><div class="mono">보유: ${inv}</div></div>`; box.appendChild(li);} 
+    function renderInventory(){ const box=$('#inventoryList'); box.innerHTML=''; 
+      const chk = document.getElementById('autoSellChkInv'); if(chk){ chk.checked = !!state.settings.autoSell; chk.onchange = ()=>{ state.settings.autoSell = !!chk.checked; save(); toast(`자동판매 ${chk.checked?'ON':'OFF'}`); }; }
+      for(const t of ORES){ const inv = state.inventory[t.key]||0; const mul=sellMultiplier(t.key); const li=document.createElement('div'); li.className='inv-item'; li.innerHTML = `<h4>${t.name} <span class="small">(${t.key})</span></h4><div>가치: <span class="price">${Math.round(t.value*mul)}</span> 골드</div><div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap"><button class="btn secondary" data-sellall="${t.key}">모두 판매</button><button class="btn secondary" data-sell="${t.key}">1개 판매</button><button class="btn" data-upg-ore="${t.key}">업그레이드</button></div><div class="row" style="margin-top:6px"><div class="mono">보유: ${inv}</div></div>`; box.appendChild(li);} 
       box.querySelectorAll('[data-sell]').forEach(btn=> btn.addEventListener('click', ()=>{ SFX.ui(); const k=btn.dataset.sell; const t=ORES.find(o=>o.key===k); if(state.inventory[k]>0){ state.inventory[k]--; state.player.gold+=Math.round(t.value*sellMultiplier(k)); save(); refresh(); }}));
       box.querySelectorAll('[data-sellall]').forEach(btn=> btn.addEventListener('click', ()=>{ SFX.ui(); sellAllOf(btn.dataset.sellall); }));
       box.querySelectorAll('[data-upg-ore]').forEach(btn=> btn.addEventListener('click', ()=>{ SFX.ui(); oreUpgrade(btn.dataset.upgOre)}));
@@ -314,13 +390,47 @@
 
     function oreUpgrade(key){ const lvl = state.upgrades.oreMul[key]||0; const cost = Math.floor(10 * Math.pow(1.6, lvl)); if((state.inventory[key]||0) < cost) { toast(`${key} x${cost} 필요`); SFX.deny(); return; } state.inventory[key]-=cost; state.upgrades.oreMul[key]=lvl+1; toast(`${key} 배율 업`); SFX.ui(); save(); refresh(); }
 
-    function renderUpgrades(){ const cont=$('#upgrades'); cont.innerHTML=''; const atkCost=Math.floor(state.upgrades.atk.baseCost*Math.pow(state.upgrades.atk.scale,state.upgrades.atk.level-1)); cont.appendChild(upgradeCard('🗡️ 공격력', `현재: ${state.player.atk}`, atkCost, ()=>{ if(spend(atkCost)){ state.upgrades.atk.level++; state.player.atk++; SFX.ui(); save(); refresh(); } else SFX.deny(); })); const critCost=Math.floor(state.upgrades.crit.baseCost*Math.pow(state.upgrades.crit.scale,state.upgrades.crit.level)); cont.appendChild(upgradeCard('🎯 치명타 확률', `현재: ${(state.player.critChance*100).toFixed(1)}%`, critCost, ()=>{ if(state.player.critChance>=0.5) return toast('최대 50%'), SFX.deny(); if(spend(critCost)){ state.upgrades.crit.level++; state.player.critChance+=0.02; SFX.ui(); save(); refresh(); } else SFX.deny(); })); const spawnCost=Math.floor(state.upgrades.spawn.baseCost*Math.pow(state.upgrades.spawn.scale,state.upgrades.spawn.level)); cont.appendChild(upgradeCard('⚙️ 생성 속도', `레벨: ${state.upgrades.spawn.level}`, spawnCost, ()=>{ if(spend(spawnCost)){ state.upgrades.spawn.level++; if(state.inRun) restartSpawnTimer(); SFX.ui(); save(); refresh(); } else SFX.deny(); })); const petCost=Math.floor(state.upgrades.pet.baseCost*Math.pow(state.upgrades.pet.scale,state.upgrades.pet.level)); cont.appendChild(upgradeCard('🤖 자동채굴 펫', `보유: ${(state.upgrades.pet.level + (state.passive.petPlus||0))}마리`, petCost, ()=>{ if(spend(petCost)){ state.upgrades.pet.level++; if(state.inRun) spawnPets(); SFX.ui(); save(); refresh(); } else SFX.deny(); })); }
+    function renderUpgrades(){ const cont=$('#upgrades'); cont.innerHTML=''; const atkCost=Math.floor(state.upgrades.atk.baseCost*Math.pow(state.upgrades.atk.scale,state.upgrades.atk.level-1)); cont.appendChild(upgradeCard('🗡️ 공격력', `현재: ${calcAtk()} (레벨 ${state.upgrades.atk.level})`, atkCost, ()=>{ if(spend(atkCost)){ state.upgrades.atk.level++; SFX.ui(); save(); refresh(); } else SFX.deny(); })); const critCost=Math.floor(state.upgrades.crit.baseCost*Math.pow(state.upgrades.crit.scale,state.upgrades.crit.level)); cont.appendChild(upgradeCard('🎯 치명타 확률', `현재: ${(state.player.critChance*100).toFixed(1)}%`, critCost, ()=>{ if(state.player.critChance>=0.5) return toast('최대 50%'), SFX.deny(); if(spend(critCost)){ state.upgrades.crit.level++; state.player.critChance+=0.02; SFX.ui(); save(); refresh(); } else SFX.deny(); })); const spawnCost=Math.floor(state.upgrades.spawn.baseCost*Math.pow(state.upgrades.spawn.scale,state.upgrades.spawn.level)); cont.appendChild(upgradeCard('⚙️ 생성 속도', `레벨: ${state.upgrades.spawn.level}`, spawnCost, ()=>{ if(spend(spawnCost)){ state.upgrades.spawn.level++; if(state.inRun) restartSpawnTimer(); SFX.ui(); save(); refresh(); } else SFX.deny(); })); const petCost=Math.floor(state.upgrades.pet.baseCost*Math.pow(state.upgrades.pet.scale,state.upgrades.pet.level)); cont.appendChild(upgradeCard('🤖 자동채굴 펫', `보유: ${(state.upgrades.pet.level + (state.passive.petPlus||0) + (state.aether?.petPlus||0))}마리`, petCost, ()=>{ if(spend(petCost)){ state.upgrades.pet.level++; if(state.inRun) spawnPets(); SFX.ui(); save(); refresh(); } else SFX.deny(); })); }
     function upgradeCard(title, desc, cost, onBuy){ const wrap=document.createElement('div'); wrap.className='inv-item'; wrap.innerHTML = `<h4 style="margin:0 0 4px 0">${title}</h4><div class="mono">${desc}</div><div class="row" style="margin-top:8px;justify-content:space-between"><div class="row"><span>가격:</span> <b class="price">${cost}</b></div><button class="btn">구매</button></div>`; wrap.querySelector('.btn').addEventListener('click', onBuy); return wrap; }
     function spend(amount){ if(state.player.gold < amount){ toast('골드 부족'); return false; } state.player.gold -= amount; return true; }
+    function spendAe(amount){ if(state.player.ether < amount){ toast('에테르 부족'); return false; } state.player.ether -= amount; return true; }
 
-    // ---------- Skills: UI ----------
+    // ---------- Aether (Rebirth-only) ----------
+    function renderAether(){
+      $('#aeBalance').textContent = state.player.ether;
+      $('#rebirths').textContent = (state.aether?.rebirths||0)+'회';
+      const canRebirth = state.highestFloor >= 20;
+      const ownAA = !!state.aether.autoAdvanceOwned;
+      $('#autoAdvanceBuyBtn').disabled = ownAA || !canRebirth || state.player.ether < 150;
+      $('#autoAdvanceBuyBtn').textContent = ownAA ? '해금됨' : '에테르 150 소모 후 해금';
+      $('#autoAdvanceChk').disabled = !ownAA;
+      $('#autoAdvanceChk').checked = !!state.aether.autoAdvanceEnabled;
+
+      const list = $('#rebirthPerks'); list.innerHTML='';
+      let total = 0;
+      for(const p of REBIRTH_PERKS){
+        const maxed = p.lvl >= p.max;
+        const cost = perkCost(p);
+        const checked = !!rebirthPick[p.key];
+        const row = document.createElement('div'); row.className='skill-card';
+        row.innerHTML = `<div class="row" style="justify-content:space-between"><b>${p.name}</b><span class="mono">${p.desc}</span></div>
+                         <div class="row" style="justify-content:space-between;margin-top:6px">
+                           <div class="mono">레벨 ${p.lvl}/${p.max} · 비용 ${cost} 에테르</div>
+                           <label class="row" style="gap:6px;align-items:center">
+                             <input type="checkbox" ${checked?'checked':''} ${maxed?'disabled':''} data-perk="${p.key}">
+                             <span>${maxed?'최대':''}선택</span>
+                           </label>
+                         </div>`;
+        list.appendChild(row);
+        if(checked && !maxed){ total += cost; }
+      }
+      $('#rebirthTotal').textContent = total;
+      const afford = state.player.ether >= total;
+      $('#rebirthBuyBtn').disabled = !(canRebirth && afford && total>0);
+    }
+
+    // ---------- Skills UI ----------
     function renderSkills(){
-      // Slots (active only)
       const slotList = $('#slotList'); slotList.innerHTML='';
       for(let i=0;i<5;i++){
         const el=document.createElement('div'); el.className='slot'; const sk = state.skillSlots[i];
@@ -339,29 +449,26 @@
       }
       $('#slotCount').textContent = state.skillSlots.filter(Boolean).length + '/5';
 
-      // Active Shop
       const shopA = $('#skillShopActive'); shopA.innerHTML='';
       for(const sk of ACTIVE_SKILLS){
         const owned = !!state.skillsOwnedActive[sk.key];
         const card = document.createElement('div'); card.className = 'skill-card';
-        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">쿨타임 ${sk.cd}s</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.gold}</b> 골드</div><button class="btn" ${owned?'disabled':''}>${owned?'보유중':'구매'}</button></div>`;
+        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">쿨타임 ${sk.cd}s</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned?'disabled':''}>${owned?'보유중':'구매'}</button></div>`;
         if(!owned){
           card.querySelector('.btn').addEventListener('click', ()=>{
-            if(!spend(sk.gold)) { SFX.deny(); return; }
-            state.skillsOwnedActive[sk.key]=true; toast(`${sk.name} 획득!`); SFX.ui(); save(); renderSkills();
+            if(!spendAe(sk.ae)) { SFX.deny(); return; }
+            state.skillsOwnedActive[sk.key]=true; toast(`${sk.name} 획득!`); SFX.ui(); save(); renderSkills(); renderTop();
           });
         }
         shopA.appendChild(card);
       }
-
-      // Passive Shop
       const shopP = $('#skillShopPassive'); shopP.innerHTML='';
       for(const sk of PASSIVE_SKILLS){
         const owned = !!state.skillsOwnedPassive[sk.key];
         const card = document.createElement('div'); card.className = 'skill-card';
-        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">패시브</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.gold}</b> 골드</div><button class="btn" ${owned && sk.once?'disabled':''}>${owned?(sk.once?'보유중':'추가 구매'):'구매'}</button></div>`;
+        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">패시브</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned && sk.once?'disabled':''}>${owned?(sk.once?'보유중':'추가 구매'):'구매'}</button></div>`;
         card.querySelector('.btn').addEventListener('click', ()=>{
-          if(!spend(sk.gold)) { SFX.deny(); return; }
+          if(!spendAe(sk.ae)) { SFX.deny(); return; }
           if(sk.once && owned){ toast('이미 보유'); SFX.deny(); return; }
           if(!state.skillsOwnedPassive[sk.key]) state.skillsOwnedPassive[sk.key]=0;
           state.skillsOwnedPassive[sk.key] += 1;
@@ -396,7 +503,7 @@
       const cd = state.skillCooldowns[key]||0; if(cd>0){ SFX.deny(); return; }
       switch(key){
         case 'berserk': state.skillAtkBuffUntil = performance.now()+5000; SFX.skill(); break;
-        case 'timewarp': state.timeLeft = Math.min(state.runTimeCap, +(state.timeLeft + 3).toFixed(1)); SFX.skill(); break;
+        case 'timewarp': state.timeLeft = Math.min(20, +(state.timeLeft + 3).toFixed(1)); SFX.skill(); break;
         case 'meteor':
           for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const dmg = Math.max(10, Math.floor(o.maxHp*0.35)); o.hp -= dmg; if(o.hp<=0){ onOreBroken(i, o); } }
           SFX.skill(); break;
@@ -404,28 +511,28 @@
         case 'sonic':
           const gr = gridRect(); const cx = (gr.left+gr.right)/2, cy=(gr.top+gr.bottom)/2;
           const idx = findNearestOreIdx(cx,cy);
-          if(idx>=0){ const o=state.grid[idx]; const dmg = Math.max(20, state.player.atk*10); o.hp-=dmg; if(o.hp<=0){ onOreBroken(idx, o); } }
+          if(idx>=0){ const o=state.grid[idx]; const dmg = Math.max(20, calcAtk()*10); o.hp-=dmg; if(o.hp<=0){ onOreBroken(idx, o); } }
           SFX.skill(); break;
       }
       setCd(key, sk.cd);
       renderSkillBar(); renderGrid(); renderTop();
     }
 
-    // ---------- Dungeon & Floors ----------
+    // ---------- Dungeon ----------
     function floorHpMul(){ return 1 + 0.25*(state.floor-1); }
     function floorValMul(){ return 1 + 0.15*(state.floor-1); }
 
-    function startRun(){ if(state.inRun) return; state.inRun = true; state.etherSpawned=false; state.timeLeft = state.runTimeBase; state.grid = new Array(25).fill(null); for(const o of ORES){ state.loot[o.key]=0; } Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]); restartSpawnTimer(); state.runStartTs = performance.now(); startTick(); spawnPets(); renderSkillBar(); refresh(); }
+    function startRun(){ if(state.inRun) return; state.inRun = true; state.etherSpawned=false; state.timeLeft = 20; state.grid = new Array(25).fill(null); for(const o of ORES){ state.loot[o.key]=0; } Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]); restartSpawnTimer(); state.runStartTs = performance.now(); startTick(); spawnPets(); renderSkillBar(); refresh(); }
 
-    // 0.1s tick & Ether dynamic spawn
     function startTick(){
       clearInterval(state.timers.tick);
       state.timers.tick = setInterval(()=>{
         if(!state.inRun) return;
         const now = performance.now();
         const elapsed = (now - state.runStartTs)/1000;
-        // Ether spawn time: 10 + floor*0.5, capped to 30 total (=> extra cap 20s)
-        const etherDelay = 10 + Math.min(state.floor*0.5, 20);
+        // Ether spawn time: base 10 + floor*0.5 (cap +20) - aether haste, min 5s
+        let etherDelay = 10 + Math.min(state.floor*0.5, 20) - (state.aether?.etherHaste||0);
+        etherDelay = Math.max(5, etherDelay);
         if(!state.etherSpawned && elapsed >= etherDelay){ spawnEther(); }
         state.timeLeft = Math.max(0, +(state.timeLeft - 0.1).toFixed(1));
         for(const k of Object.keys(state.skillCooldowns)){ state.skillCooldowns[k] = Math.max(0, state.skillCooldowns[k]-0.1); }
@@ -445,11 +552,28 @@
     function exitRun(){ if(!state.inRun) return; bankAndExit(false); }
 
     function bankAndExit(cleared){
-      for(const k in state.loot){ state.inventory[k] = (state.inventory[k]||0) + state.loot[k]; }
+      // 자동판매가 켜져 있으면 전리품을 골드로 정산, 아니면 인벤토리로 이관
+      if(state.settings?.autoSell){
+        let totalGold = 0;
+        for(const k in state.loot){
+          const oreDef = ORES.find(o=>o.key===k);
+          const n = state.loot[k]||0;
+          if(!oreDef || n<=0) continue;
+          totalGold += Math.round(n * oreDef.value * sellMultiplier(k));
+        }
+        if(totalGold>0) state.player.gold += totalGold;
+      } else {
+        for(const k in state.loot){ state.inventory[k] = (state.inventory[k]||0) + state.loot[k]; }
+      }
+      // 전리품 초기화
+      for(const k in state.loot){ state.loot[k]=0; }
       state.inRun=false; clearInterval(state.timers.spawn); clearInterval(state.timers.tick);
       state.pets=[]; state.lastAnimTs=0; state.grid = new Array(25).fill(null);
       if(cleared){ state.floor++; if(state.floor>state.highestFloor) state.highestFloor=state.floor; }
       save(); refresh(); renderSkillBar();
+      if(cleared && state.aether?.autoAdvanceOwned && state.aether.autoAdvanceEnabled){
+        setTimeout(()=>{ startRun(); }, 250);
+      }
     }
 
     function spawnOre(){
@@ -465,19 +589,25 @@
       renderGrid();
     }
 
-    function spawnEther(){ const idx = 12; state.etherSpawned = true; const hp = Math.round(1500 * floorHpMul()); state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7' }; renderGrid(); }
+    // Ether boss HP quadratic scaling
+    function spawnEther(){ const idx = 12; state.etherSpawned = true; 
+      const baseE = 250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
+      const hp = Math.round(baseE * Math.pow(1+r, exp));
+      state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7' }; renderGrid(); }
 
     function onOreBroken(idx, ore){
       if(ore.type==='EtherOre'){ state.player.ether += 10; toast('✨ 에테르 +10'); state.grid[idx] = null; SFX.break(); bankAndExit(true); return; }
+      // 던전 중에는 항상 임시 전리품(loot)에 적립
       state.loot[ore.type] = (state.loot[ore.type]||0)+1;
       state.grid[idx] = null;
-      state.timeLeft = Math.min(state.runTimeCap, +(state.timeLeft + 0.1).toFixed(1));
+      state.timeLeft = Math.min(20, +(state.timeLeft + 0.1).toFixed(1));
       SFX.break();
+      renderTop();
     }
 
     function hit(idx, source='tap'){
       if(!state.inRun) return; const ore = state.grid[idx]; if(!ore) return;
-      let dmg = state.player.atk * (state.skillAtkBuffUntil>performance.now()?2:1);
+      let dmg = calcAtk() * (state.skillAtkBuffUntil>performance.now()?2:1);
       const crit = (Math.random() < state.player.critChance && source==='tap');
       if(crit) dmg = Math.floor(dmg * state.player.critMult);
       ore.hp -= dmg;
@@ -488,7 +618,7 @@
       renderGrid();
     }
 
-    // ---------- Sliding / Hitbox (mobile-friendly) ----------
+    // ---------- Pointer (slide mining) ----------
     function onPointerDown(e){ e.preventDefault(); trackPointer(e, true); }
     function onPointerMove(e){ e.preventDefault(); trackPointer(e, false); }
     function onPointerUp(e){ const ps = state.pointerState[e.pointerId]; if(ps) delete state.pointerState[e.pointerId]; }
@@ -504,10 +634,10 @@
     document.addEventListener('touchstart', (e)=>{ startY = e.touches[0].clientY; atTop = (document.scrollingElement?.scrollTop || 0) <= 0; }, {passive:true});
     document.addEventListener('touchmove', (e)=>{ if(atTop){ const dy = e.touches[0].clientY - startY; if(dy > 5) e.preventDefault(); } }, {passive:false});
 
-    // ---------- Pets (RAF + separation) ----------
+    // ---------- Pets ----------
     function spawnPets(){
       state.pets = [];
-      const count = (state.upgrades.pet.level || 0) + (state.passive.petPlus || 0);
+      const count = (state.upgrades.pet.level || 0) + (state.passive.petPlus || 0) + (state.aether?.petPlus||0);
       const gr = gridRect();
       for(let i=0;i<count;i++){ state.pets.push({ x: gr.left + Math.random()*gr.width, y: gr.top + Math.random()*gr.height, vx:0, vy:0, targetIdx:-1, cd:0 }); }
       renderPets();
@@ -519,17 +649,19 @@
       for(const p of state.pets){ p.x += p.vx*dt; p.y += p.vy*dt; p.x = Math.max(gr.left+8, Math.min(gr.right-8, p.x)); p.y = Math.max(gr.top+8, Math.min(gr.bottom-8, p.y)); if(p.targetIdx>=0){ const c=cellCenter(p.targetIdx); const dist=Math.hypot(c.x-p.x, c.y-p.y); p.cd -= dt; if(dist<=PET.atkRange && p.cd<=0){ p.cd = PET.atkInterval; hit(p.targetIdx,'pet'); } } }
       renderPets(); requestAnimationFrame(petsFrame); }
 
-    // ---------- Tabs & Events (with UI SFX) ----------
+    // ---------- Tabs & Events ----------
     document.querySelectorAll('.tab-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         SFX.ui();
         document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
         const t=btn.dataset.tab;
-        ['dungeon','inventory','upgrades','skills','settings'].forEach(id=>{
+        ['dungeon','inventory','upgrades','skills','aether','settings'].forEach(id=>{
           document.querySelector('#tab-'+id).style.display = (id===t? 'block':'none');
         });
         renderTop();
         if(t==='skills') renderSkills();
+        if(t==='aether') renderAether();
+        if(t==='inventory') renderInventory();
       })
     });
     $('#toggleRunBtn').addEventListener('click', ()=>{ ensureAudio(); SFX.ui(); startRun(); });
@@ -538,13 +670,57 @@
     $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 초기화할까요?')){ localStorage.removeItem(VERSION); location.reload(); } });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
     $('#toggleSoundBtn').addEventListener('click', ()=>{ SFX.ui(); sfxEnabled=!sfxEnabled; $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`; });
+    document.getElementById('autoAdvanceBuyBtn').addEventListener('click', ()=>{
+      if(state.aether.autoAdvanceOwned) return;
+      if(state.highestFloor < 20) return toast('지하 20층 이상에서 해금 가능합니다.');
+      if(state.player.ether < 150) return toast('에테르 부족');
+      state.player.ether -= 150;
+      state.aether.autoAdvanceOwned = true;
+      state.aether.autoAdvanceEnabled = true;
+      save(); renderAether(); renderTop(); toast('자동 이동 해금!');
+    });
+    document.getElementById('autoAdvanceChk').addEventListener('change', (e)=>{
+      if(!state.aether.autoAdvanceOwned){ e.target.checked=false; return; }
+      state.aether.autoAdvanceEnabled = e.target.checked; save();
+    });
+    document.getElementById('rebirthBuyBtn').addEventListener('click', ()=>{
+      if(state.highestFloor < 20) return;
+      // compute total
+      let total = 0;
+      const chosen = [];
+      for(const p of REBIRTH_PERKS){
+        if(rebirthPick[p.key]){
+          const cost = perkCost(p);
+          if(p.lvl >= p.max) continue;
+          total += cost; chosen.push(p);
+        }
+      }
+      if(total<=0) return;
+      if(state.player.ether < total) return toast('에테르 부족');
+      if(!confirm('선택한 보너스를 구매하고 환생하시겠습니까?')) return;
+      // pay & apply
+      state.player.ether -= total;
+      for(const p of chosen){ p.apply(); }
+      // perform rebirth
+      if(state.inRun) bankAndExit(false);
+      state.floor = 1; state.aether.rebirths = (state.aether.rebirths||0)+1;
+      for(const k in rebirthPick){ delete rebirthPick[k]; }
+      save(); renderAether(); renderTop(); toast('보너스 구매 및 환생 완료!');
+    });
+    document.addEventListener('change', (e)=>{
+      const t = e.target;
+      if(t && t.matches('input[data-perk]')){
+        rebirthPick[t.dataset.perk] = t.checked ? 1 : 0;
+        renderAether();
+      }
+    });
 
     // ---------- Boot ----------
-    function boot(){ load(); renderGrid(); renderInventory(); renderUpgrades(); renderSkills(); renderTop(); renderSkillBar(); }
+    function boot(){ load(); renderGrid(); renderInventory(); renderUpgrades(); renderSkills(); renderAether(); renderTop(); renderSkillBar(); }
     boot();
 
     // ---------- Utils ----------
-    function toast(msg){ const t=document.createElement('div'); t.textContent=msg; Object.assign(t.style,{position:'fixed',left:'50%',top:'14%',transform:'translateX(-50%)',background:'#11193a',border:'1px solid #263165',padding:'10px 14px',borderRadius:'12px',color:'#eaf2ff',zIndex:9999}); document.body.appendChild(t); setTimeout(()=>t.remove(),900); }
+    function toast(msg){ const t=document.createElement('div'); t.textContent=msg; Object.assign(t.style,{position:'fixed',left:'50%',top:'14%',transform:'translateX(-50%)',background:'#11193a',border:'1px solid #263165',padding:'10px 14px',borderRadius:'12px',color:'#eaf2ff',zIndex:9999}); document.body.appendChild(t); setTimeout(()=>t.remove(),1100); }
     function refresh(){ renderTop(); renderGrid(); renderInventory(); renderUpgrades(); }
   })();
   </script>
