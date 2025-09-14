@@ -166,6 +166,8 @@
       <section id="tab-settings" class="panel" style="display:none">
         <div class="row" style="flex-wrap:wrap;gap:10px">
           <button id="saveBtn" class="btn secondary">수동 저장</button>
+          <button id="exportBtn" class="btn secondary">내보내기</button>
+          <button id="importBtn" class="btn secondary">불러오기</button>
           <button id="fullscreenBtn" class="btn secondary">전체화면</button>
           <button id="toggleSoundBtn" class="btn ghost">효과음: 켜짐</button>
           <button id="resetBtn" class="btn danger">초기화</button>
@@ -178,7 +180,10 @@
 
   <script>
   (()=>{
-    const VERSION = 'miner_v2.5.0';
+    const VERSION = 'miner_v2.6.0';
+    // 고정 세이브키 + 구버전 마이그레이션
+    const SAVE_KEY = 'miner_save_v1';
+    const LEGACY_KEYS = Object.keys(localStorage).filter(k=>/^miner_v/.test(k));
 
     // ---------- Audio ----------
     let audioCtx = null, sfxEnabled = true;
@@ -245,6 +250,43 @@
       settings: { autoSell:false }
     };
 
+    // ---------- Save/Load (stable key + migration) ----------
+    function save(){
+      const payload = {
+        __version: VERSION,
+        player:state.player, upgrades:state.upgrades, floor:state.floor, highestFloor:state.highestFloor,
+        inventory:state.inventory, skillsOwnedActive:state.skillsOwnedActive, skillsOwnedPassive:state.skillsOwnedPassive,
+        skillSlots:state.skillSlots, passive:state.passive, aether:state.aether, settings:state.settings
+      };
+      try{ localStorage.setItem(SAVE_KEY, JSON.stringify(payload)); }catch(e){ console.warn('save failed', e); }
+    }
+    function load(){
+      let raw = localStorage.getItem(SAVE_KEY);
+      if(!raw){
+        for(const k of LEGACY_KEYS){
+          raw = localStorage.getItem(k);
+          if(raw){ try{ localStorage.setItem(SAVE_KEY, raw); }catch(e){} break; }
+        }
+      }
+      if(!raw) return;
+      try{
+        const s = JSON.parse(raw);
+        Object.assign(state.player,s.player||{});
+        Object.assign(state.upgrades,s.upgrades||{});
+        state.floor=s.floor||1; state.highestFloor=s.highestFloor||1;
+        state.inventory=s.inventory||state.inventory;
+        state.skillsOwnedActive=s.skillsOwnedActive||{};
+        state.skillsOwnedPassive=s.skillsOwnedPassive||{};
+        state.skillSlots=s.skillSlots||[null,null,null,null,null];
+        state.passive=s.passive||state.passive;
+        state.aether = s.aether || state.aether;
+        state.settings = s.settings || state.settings;
+        if(typeof state.player.atkBase === 'undefined'){
+          state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 1;
+        }
+      }catch(e){ console.warn('load failed', e); }
+    }
+
     // ---------- Skills ----------
     const ACTIVE_SKILLS = [
       { key:'berserk',  name:'광폭화',   desc:'5초간 공격력 x2',         ae:150, cd:20 },
@@ -291,33 +333,6 @@
     const $ = sel => document.querySelector(sel);
     const gridEl = $('#grid');
     const skillBarEl = $('#skillBar');
-
-    function save(){
-      localStorage.setItem(VERSION, JSON.stringify({
-        player:state.player, upgrades:state.upgrades, floor:state.floor, highestFloor:state.highestFloor,
-        inventory:state.inventory, skillsOwnedActive:state.skillsOwnedActive, skillsOwnedPassive:state.skillsOwnedPassive,
-        skillSlots:state.skillSlots, passive:state.passive, aether:state.aether, settings:state.settings
-      }));
-    }
-    function load(){
-      const raw = localStorage.getItem(VERSION); if(!raw) return;
-      try{
-        const s = JSON.parse(raw);
-        Object.assign(state.player,s.player||{});
-        Object.assign(state.upgrades,s.upgrades||{});
-        state.floor=s.floor||1; state.highestFloor=s.highestFloor||1;
-        state.inventory=s.inventory||state.inventory;
-        state.skillsOwnedActive=s.skillsOwnedActive||{};
-        state.skillsOwnedPassive=s.skillsOwnedPassive||{};
-        state.skillSlots=s.skillSlots||[null,null,null,null,null];
-        state.passive=s.passive||state.passive;
-        state.aether = s.aether || state.aether;
-        state.settings = s.settings || state.settings;
-        if(typeof state.player.atkBase === 'undefined'){
-          state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 1;
-        }
-      }catch(e){}
-    }
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
     function eligibleOresForFloor(f){
@@ -617,6 +632,7 @@
     gridEl.addEventListener('pointerup', onPointerUp, {passive:false});
     gridEl.addEventListener('pointercancel', onPointerUp, {passive:false});
 
+    // Pull-to-refresh guard
     let startY = 0, atTop = false;
     document.addEventListener('touchstart', (e)=>{ startY = e.touches[0].clientY; atTop = (document.scrollingElement?.scrollTop || 0) <= 0; }, {passive:true});
     document.addEventListener('touchmove', (e)=>{ if(atTop){ const dy = e.touches[0].clientY - startY; if(dy > 5) e.preventDefault(); } }, {passive:false});
@@ -652,9 +668,27 @@
     $('#toggleRunBtn').addEventListener('click', ()=>{ ensureAudio(); SFX.ui(); startRun(); });
     $('#exitBtn').addEventListener('click', ()=>{ SFX.ui(); bankAndExit(false); });
     $('#saveBtn').addEventListener('click', ()=>{ SFX.ui(); save(); });
-    $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 초기화할까요?')){ localStorage.removeItem(VERSION); location.reload(); } });
+    $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 초기화할까요?')){ localStorage.removeItem(SAVE_KEY); location.reload(); } });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
     $('#toggleSoundBtn').addEventListener('click', ()=>{ SFX.ui(); sfxEnabled=!sfxEnabled; $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`; });
+
+    // Export / Import for backup/move domains
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      SFX.ui();
+      const blob = new Blob([localStorage.getItem(SAVE_KEY)||'{}'], {type:'application/json'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'miner_save.json'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+    });
+    document.getElementById('importBtn').addEventListener('click', ()=>{
+      SFX.ui();
+      const i = document.createElement('input'); i.type='file'; i.accept='application/json';
+      i.onchange = async ()=>{ const f=i.files?.[0]; if(!f) return; const text = await f.text();
+        try{ JSON.parse(text); localStorage.setItem(SAVE_KEY, text); location.reload(); }
+        catch(e){ alert('불러오기 실패: 잘못된 파일'); }
+      };
+      i.click();
+    });
+
     document.getElementById('autoAdvanceBuyBtn').addEventListener('click', ()=>{
       if(state.aether.autoAdvanceOwned) return;
       if(state.highestFloor < 20) return toast('지하 20층 이상에서 해금 가능합니다.');
