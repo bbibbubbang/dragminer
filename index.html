@@ -357,7 +357,13 @@
     function gridRect(){
       const r = gridEl.getBoundingClientRect();
       if(r.width && r.height){
-        gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
+        if(!gridRectCache){
+          gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
+        } else {
+          const width = Math.max(gridRectCache.width, r.width);
+          const height = Math.max(gridRectCache.height, r.height);
+          gridRectCache = {left:r.left, top:r.top, width, height, right:r.left + width, bottom:r.top + height};
+        }
       }
       return gridRectCache || {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
     }
