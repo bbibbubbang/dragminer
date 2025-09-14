@@ -706,7 +706,10 @@
         screenEl.scrollTop = 0;
         screenEl.style.overflowY = t==='dungeon' ? 'hidden' : 'auto';
         renderTop();
-        if(t==='dungeon') renderGrid();
+        if(t==='dungeon'){
+          gridRectCache = null;
+          renderGrid();
+        }
         if(t==='skills') renderSkills();
         if(t==='aether') renderAether();
         if(t==='inventory') renderInventory();
