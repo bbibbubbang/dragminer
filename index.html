@@ -340,6 +340,7 @@
     const gridEl = $('#grid');
     const skillBarEl = $('#skillBar');
     const screenEl = $('.screen');
+    let gridRectCache = null;
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
       function eligibleOresForFloor(f){
@@ -353,7 +354,11 @@
           return { ...o, weight: Math.max(1, Math.round(weight)) };
         });
       }
-    function gridRect(){ return gridEl.getBoundingClientRect(); }
+    function gridRect(){
+      const r = gridEl.getBoundingClientRect();
+      if(r.width && r.height){ gridRectCache = r; return r; }
+      return gridRectCache || r;
+    }
     function cellCenter(idx){ const o = state.grid[idx]; return { x:o.x, y:o.y }; }
     function oreIndexFromPoint(x,y){ for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const h=26; if(x>=o.x-h && x<=o.x+h && y>=o.y-h && y<=o.y+h) return i; } return -1; }
 
