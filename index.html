@@ -170,6 +170,7 @@
           <button id="importBtn" class="btn secondary">불러오기</button>
           <button id="fullscreenBtn" class="btn secondary">전체화면</button>
           <button id="toggleSoundBtn" class="btn ghost">효과음: 켜짐</button>
+          <button id="resetFloorBtn" class="btn danger">층수만 1로</button>
           <button id="resetBtn" class="btn danger">초기화</button>
         </div>
       </section>
@@ -180,7 +181,7 @@
 
   <script>
   (()=>{
-    const VERSION = 'miner_v2.6.0';
+    const VERSION = 'miner_v2.6.1';
     // 고정 세이브키 + 구버전 마이그레이션
     const SAVE_KEY = 'miner_save_v1';
     const LEGACY_KEYS = Object.keys(localStorage).filter(k=>/^miner_v/.test(k));
@@ -668,7 +669,8 @@
     $('#toggleRunBtn').addEventListener('click', ()=>{ ensureAudio(); SFX.ui(); startRun(); });
     $('#exitBtn').addEventListener('click', ()=>{ SFX.ui(); bankAndExit(false); });
     $('#saveBtn').addEventListener('click', ()=>{ SFX.ui(); save(); });
-    $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 초기화할까요?')){ localStorage.removeItem(SAVE_KEY); location.reload(); } });
+    $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 전체 초기화할까요? (세이브 전부 삭제)')){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} try{ LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){} location.reload(); } });
+    $('#resetFloorBtn').addEventListener('click', ()=>{ SFX.ui(); if(!confirm('현재 층만 1로 되돌릴까요?')) return; state.floor = 1; save(); renderTop(); toast('층수 1로 설정'); });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
     $('#toggleSoundBtn').addEventListener('click', ()=>{ SFX.ui(); sfxEnabled=!sfxEnabled; $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`; });
 
