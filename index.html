@@ -33,9 +33,8 @@
     .timerbar > div{height:100%;background:linear-gradient(90deg, #22c55e, #facc15);width:100%}
 
     .grid-wrap{position:relative}
-    .grid{position:relative;display:grid;gap:6px;background:#0e1328;padding:6px;border-radius:16px;border:1px solid #202a51;grid-template-columns:repeat(5,1fr); touch-action: none;}
-    .cell{position:relative;background:#121737;border:1px solid #1f2752;border-radius:10px;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden; touch-action: none;}
-    .cell .ore{position:absolute;inset:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#0a0e1e;text-shadow:0 1px 0 rgba(255,255,255,.2);} 
+    .grid{position:relative;background:#0e1328;padding:6px;border-radius:16px;border:1px solid #202a51;touch-action: none;height:300px;}
+    .ore{position:absolute;width:52px;height:52px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#0a0e1e;text-shadow:0 1px 0 rgba(255,255,255,.2);}
     .ore .name{display:none}
     .hp{position:absolute;top:6px;left:6px;right:6px;height:8px;background:rgba(0,0,0,.35);border-radius:999px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .hp>div{height:100%;background:linear-gradient(90deg,#34d399,#f59e0b);width:100%}
@@ -71,6 +70,7 @@
     .ae-meta{color:#c4b5fd}
 
     footer{padding:8px 0}
+    #ad-container{min-height:90px;display:flex;justify-content:center;align-items:center;width:100%}
   </style>
 </head>
 <body>
@@ -175,7 +175,9 @@
       </section>
     </main>
 
-    <footer></footer>
+    <footer>
+      <div id="ad-container"><!-- Google AdSense --></div>
+    </footer>
   </div>
 
   <script>
@@ -349,11 +351,9 @@
           return { ...o, weight: Math.max(1, Math.round(weight)) };
         });
       }
-    function cellIndexFromPoint(x,y){ const el = document.elementFromPoint(x,y); const cell = el && el.closest ? el.closest('.cell') : null; return cell? +cell.dataset.idx : -1; }
     function gridRect(){ return gridEl.getBoundingClientRect(); }
-    function cellRect(idx){ return gridEl.children[idx].getBoundingClientRect(); }
-    function cellCenter(idx){ const r = cellRect(idx); return { x:r.left + r.width/2, y:r.top + r.height/2 }; }
-    function insideHitbox(idx, x, y){ if(idx<0) return false; const r = cellRect(idx); const padX=r.width*0.15, padY=r.height*0.15; return (x>r.left+padX && x<r.right-padX && y>r.top+padY && y<r.bottom-padY); }
+    function cellCenter(idx){ const o = state.grid[idx]; return { x:o.x, y:o.y }; }
+    function oreIndexFromPoint(x,y){ for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const h=26; if(x>=o.x-h && x<=o.x+h && y>=o.y-h && y<=o.y+h) return i; } return -1; }
 
     function sellMultiplier(key){
       const lvl = state.upgrades.oreMul[key]||0;
@@ -393,8 +393,8 @@
       document.body.classList.toggle('lock-v', isDungeonVisible);
     }
 
-    function renderGrid(){ if(!gridEl.childElementCount){ for(let i=0;i<25;i++){ const d=document.createElement('div'); d.className='cell'; d.dataset.idx=i; gridEl.appendChild(d); } }
-      state.grid.forEach((ore, i)=>{ const c = gridEl.children[i]; c.innerHTML=''; if(ore){ const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; c.appendChild(el); c.appendChild(hp);} });
+    function renderGrid(){ gridEl.innerHTML=''; const gr=gridRect();
+      for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const localX=ore.x-gr.left-26; const localY=ore.y-gr.top-26; el.style.transform=`translate(${localX}px, ${localY}px)`; el.dataset.idx=i; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; el.appendChild(hp); gridEl.appendChild(el); ore.el = el; }
       renderPets(); }
 
     function renderInventory(){ const box=$('#inventoryList'); box.innerHTML='';
@@ -616,14 +616,22 @@
       const growth = 1 + 0.02 * Math.max(0, Math.floor(elapsed));
       const hp = Math.round(base.hp*floorHpMul()*growth*(state.skillAtkBuffUntil>performance.now()?0.9:1));
       const value = Math.round(base.value*floorValMul());
-      state.grid[idx] = { type: base.key, label: base.name, hp, maxHp: hp, value, bg: base.color };
+      const gr = gridRect();
+      const x = gr.left + 26 + Math.random()*(gr.width-52);
+      const y = gr.top + 26 + Math.random()*(gr.height-52);
+      state.grid[idx] = { type: base.key, label: base.name, hp, maxHp: hp, value, bg: base.color, x, y };
       renderGrid();
     }
 
-      function spawnEther(){ const idx = 12; state.etherSpawned = true;
+      function spawnEther(){
+        const empties = state.grid.map((v,i)=> v? null : i).filter(v=>v!==null); if(empties.length===0) return;
+        const idx = empties[Math.floor(Math.random()*empties.length)]; state.etherSpawned = true;
         const baseE = 1250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
         const hp = Math.round(baseE * Math.pow(1+r, exp));
-        state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7' }; renderGrid(); }
+        const gr = gridRect();
+        const x = gr.left + 26 + Math.random()*(gr.width-52);
+        const y = gr.top + 26 + Math.random()*(gr.height-52);
+        state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7', x, y }; renderGrid(); }
 
     function onOreBroken(idx, ore){
       if(ore.type==='EtherOre'){ state.player.ether += 10; toast('✨ 에테르 +10'); state.grid[idx] = null; SFX.break(); bankAndExit(true); return; }
@@ -641,17 +649,18 @@
       const crit = (Math.random() < state.player.critChance && source==='tap');
       if(crit) dmg = Math.floor(dmg * state.player.critMult);
       ore.hp -= dmg;
-      const cell = gridEl.children[idx];
-      const dm = document.createElement('div'); dm.className='dmg'; dm.textContent = (crit?'CRIT ':'') + '-' + dmg; dm.style.left='50%'; dm.style.top='38%'; dm.style.transform='translateX(-50%)'; cell.appendChild(dm); setTimeout(()=>dm.remove(), 520);
-      (crit?SFX.crit:SFX.hit)();
-      if(ore.hp <= 0){ onOreBroken(idx, ore); renderTop(); }
+      const alive = ore.hp > 0;
+      if(!alive){ onOreBroken(idx, ore); renderTop(); }
       renderGrid();
+      const cell = state.grid[idx]?.el;
+      if(alive && cell){ const dm = document.createElement('div'); dm.className='dmg'; dm.textContent = (crit?'CRIT ':'') + '-' + dmg; dm.style.left='50%'; dm.style.top='38%'; dm.style.transform='translateX(-50%)'; cell.appendChild(dm); setTimeout(()=>dm.remove(), 520); }
+      (crit?SFX.crit:SFX.hit)();
     }
 
     function onPointerDown(e){ e.preventDefault(); trackPointer(e, true); }
     function onPointerMove(e){ e.preventDefault(); trackPointer(e, false); }
     function onPointerUp(e){ const ps = state.pointerState[e.pointerId]; if(ps) delete state.pointerState[e.pointerId]; }
-    function trackPointer(e, isDown){ const id=e.pointerId||0; const idx = cellIndexFromPoint(e.clientX, e.clientY); const inside = insideHitbox(idx, e.clientX, e.clientY) && state.grid[idx]; const prev = state.pointerState[id] || { idx:-1, inside:false }; if(isDown){ if(inside && idx>=0) { hit(idx,'tap'); state.pointerState[id] = { idx, inside:true }; } else { state.pointerState[id] = { idx, inside:false }; } } else { if(prev.idx !== idx){ prev.inside = false; prev.idx = idx; } if(!prev.inside && inside){ if(idx>=0) hit(idx,'tap'); prev.inside = true; prev.idx = idx; } if(prev.inside && !inside){ prev.inside = false; } state.pointerState[id] = prev; } }
+    function trackPointer(e, isDown){ const id=e.pointerId||0; const idx = oreIndexFromPoint(e.clientX, e.clientY); const inside = idx>=0; const prev = state.pointerState[id] || { idx:-1, inside:false }; if(isDown){ if(inside){ hit(idx,'tap'); state.pointerState[id]={idx,inside:true}; } else { state.pointerState[id]={idx,inside:false}; } } else { if(prev.idx!==idx){ prev.inside=false; prev.idx=idx; } if(!prev.inside && inside){ hit(idx,'tap'); prev.inside=true; prev.idx=idx; } if(prev.inside && !inside){ prev.inside=false; } state.pointerState[id]=prev; } }
 
     gridEl.addEventListener('pointerdown', onPointerDown, {passive:false});
     gridEl.addEventListener('pointermove', onPointerMove, {passive:false});
@@ -671,7 +680,7 @@
       renderPets();
     }
     function renderPets(){ gridEl.querySelectorAll('.pet').forEach(p=>p.remove()); const gr = gridRect(); for(const p of state.pets){ const el=document.createElement('div'); el.className='pet'; const localX = p.x - gr.left - 8; const localY = p.y - gr.top - 8; el.style.transform = `translate(${localX}px, ${localY}px)`; gridEl.appendChild(el); } }
-    function findNearestOreIdx(x,y){ let best=-1, bestD=1e9; for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const c=cellCenter(i); const d=Math.hypot(c.x-x, c.y-y); if(d<bestD){ bestD=d; best=i; } } return best; }
+    function findNearestOreIdx(x,y){ let best=-1, bestD=1e9; for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const d=Math.hypot(ore.x-x, ore.y-y); if(d<bestD){ bestD=d; best=i; } } return best; }
     function petsFrame(ts){ if(!state.inRun) return; const gr=gridRect(); const dt=Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016); state.lastAnimTs=ts; for(const p of state.pets){ if(p.targetIdx<0 || !state.grid[p.targetIdx]) p.targetIdx = findNearestOreIdx(p.x,p.y); if(p.targetIdx>=0){ const c=cellCenter(p.targetIdx); const dx=c.x-p.x, dy=c.y-p.y; const dist=Math.hypot(dx,dy)||1; const speed = dist<28 ? PET.moveSpeed*(dist/28) : PET.moveSpeed; const steerX = (dx/dist)*speed - p.vx; const steerY = (dy/dist)*speed - p.vy; p.vx += steerX*0.12; p.vy += steerY*0.12; } else { p.vx += (Math.random()-0.5)*10*dt; p.vy += (Math.random()-0.5)*10*dt; } }
       for(let i=0;i<state.pets.length;i++){ for(let j=i+1;j<state.pets.length;j++){ const a=state.pets[i], b=state.pets[j]; const dx=b.x-a.x, dy=b.y-a.y; const d=Math.hypot(dx,dy); const r=PET.sepRadius; if(d>0 && d<r){ const push=(r-d)/r*60; const nx=dx/d, ny=dy/d; a.vx -= nx*push; a.vy -= ny*push; b.vx += nx*push; b.vy += ny*push; } } }
       for(const p of state.pets){ p.x += p.vx*dt; p.y += p.vy*dt; p.x = Math.max(gr.left+8, Math.min(gr.right-8, p.x)); p.y = Math.max(gr.top+8, Math.min(gr.bottom-8, p.y)); if(p.targetIdx>=0){ const c=cellCenter(p.targetIdx); const dist=Math.hypot(c.x-p.x, c.y-p.y); p.cd -= dt; if(dist<=PET.atkRange && p.cd<=0){ p.cd = PET.atkInterval; hit(p.targetIdx,'pet'); } } }
