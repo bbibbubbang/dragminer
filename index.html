@@ -178,7 +178,7 @@
 
   <script>
   (()=>{
-    const VERSION = 'miner_v2.4.0';
+    const VERSION = 'miner_v2.5.0';
 
     // ---------- Audio ----------
     let audioCtx = null, sfxEnabled = true;
@@ -204,20 +204,11 @@
       ui(){ beep(430,0.05,'triangle',0.035); }
     };
 
-    // ---------- ATK scaling ----------
-    const ATK_RATE = 0.03; // multiplicative per (level-1)^2
-    function calcAtk() {
-      const lvl = state.upgrades.atk?.level || 1;
-      const base = state.player.atkBase || 1;
-      const mul = Math.pow(1 + ATK_RATE, Math.max(0, (lvl-1)*(lvl-1)));
-      return Math.max(1, Math.floor(base * mul));
-    }
-
     // ---------- Game State ----------
     const state = {
       player: { atkBase: 1, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
       upgrades: {
-        atk:   { level: 1, baseCost: 20,  scale: 1.55 },
+        atk:   { level: 1, baseCost: 30,  scale: 1.35 },
         crit:  { level: 0, baseCost: 50,  scale: 1.7  },
         spawn: { level: 0, baseCost: 80,  scale: 1.8  },
         pet:   { level: 0, baseCost: 150, scale: 2.0  },
@@ -293,12 +284,10 @@
       { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:300, value:180, weight: 2,  tier:6, minFloor:22 },
     ];
 
-    // init inventories
     for(const o of ORES){ state.inventory[o.key]=state.inventory[o.key]||0; state.loot[o.key]=0; state.upgrades.oreMul[o.key]=state.upgrades.oreMul[o.key]||0; }
 
     const PET = { moveSpeed: 220, atkInterval: 0.55, sepRadius: 24, atkRange: 18 };
 
-    // ---------- Helpers ----------
     const $ = sel => document.querySelector(sel);
     const gridEl = $('#grid');
     const skillBarEl = $('#skillBar');
@@ -324,7 +313,6 @@
         state.passive=s.passive||state.passive;
         state.aether = s.aether || state.aether;
         state.settings = s.settings || state.settings;
-        // migrate atkBase if missing (legacy)
         if(typeof state.player.atkBase === 'undefined'){
           state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 1;
         }
@@ -354,7 +342,16 @@
       return upgMul * passiveMul;
     }
 
-    // ---------- UI Rendering ----------
+    function calcAtk() {
+      const L = state.upgrades.atk?.level || 1;
+      const base = state.player.atkBase || 1;
+      const ATK_PER_LVL = 0.12;
+      const ATK_MILE    = 0.35;
+      const per   = Math.pow(1 + ATK_PER_LVL, Math.max(0, L - 1));
+      const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, L - 1) / 10));
+      return Math.max(1, Math.ceil(base * per * bonus));
+    }
+
     function fmtFloor(n){ return `지하 ${n}층`; }
     function renderHud(){
       $('#hud1').textContent = `💰 ${state.player.gold} · ✨ ${state.player.ether}`;
@@ -377,7 +374,7 @@
       state.grid.forEach((ore, i)=>{ const c = gridEl.children[i]; c.innerHTML=''; if(ore){ const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; c.appendChild(el); c.appendChild(hp);} });
       renderPets(); }
 
-    function renderInventory(){ const box=$('#inventoryList'); box.innerHTML=''; 
+    function renderInventory(){ const box=$('#inventoryList'); box.innerHTML='';
       const chk = document.getElementById('autoSellChkInv'); if(chk){ chk.checked = !!state.settings.autoSell; chk.onchange = ()=>{ state.settings.autoSell = !!chk.checked; save(); toast(`자동판매 ${chk.checked?'ON':'OFF'}`); }; }
       for(const t of ORES){ const inv = state.inventory[t.key]||0; const mul=sellMultiplier(t.key); const li=document.createElement('div'); li.className='inv-item'; li.innerHTML = `<h4>${t.name} <span class="small">(${t.key})</span></h4><div>가치: <span class="price">${Math.round(t.value*mul)}</span> 골드</div><div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap"><button class="btn secondary" data-sellall="${t.key}">모두 판매</button><button class="btn secondary" data-sell="${t.key}">1개 판매</button><button class="btn" data-upg-ore="${t.key}">업그레이드</button></div><div class="row" style="margin-top:6px"><div class="mono">보유: ${inv}</div></div>`; box.appendChild(li);} 
       box.querySelectorAll('[data-sell]').forEach(btn=> btn.addEventListener('click', ()=>{ SFX.ui(); const k=btn.dataset.sell; const t=ORES.find(o=>o.key===k); if(state.inventory[k]>0){ state.inventory[k]--; state.player.gold+=Math.round(t.value*sellMultiplier(k)); save(); refresh(); }}));
@@ -395,7 +392,6 @@
     function spend(amount){ if(state.player.gold < amount){ toast('골드 부족'); return false; } state.player.gold -= amount; return true; }
     function spendAe(amount){ if(state.player.ether < amount){ toast('에테르 부족'); return false; } state.player.ether -= amount; return true; }
 
-    // ---------- Aether (Rebirth-only) ----------
     function renderAether(){
       $('#aeBalance').textContent = state.player.ether;
       $('#rebirths').textContent = (state.aether?.rebirths||0)+'회';
@@ -429,7 +425,6 @@
       $('#rebirthBuyBtn').disabled = !(canRebirth && afford && total>0);
     }
 
-    // ---------- Skills UI ----------
     function renderSkills(){
       const slotList = $('#slotList'); slotList.innerHTML='';
       for(let i=0;i<5;i++){
@@ -511,16 +506,15 @@
         case 'sonic':
           const gr = gridRect(); const cx = (gr.left+gr.right)/2, cy=(gr.top+gr.bottom)/2;
           const idx = findNearestOreIdx(cx,cy);
-          if(idx>=0){ const o=state.grid[idx]; const dmg = Math.max(20, calcAtk()*10); o.hp-=dmg; if(o.hp<=0){ onOreBroken(idx, o); } }
+          if(idx>=0){ const o=state.grid[idx]; const dmg = Math.max(20, Math.round(calcAtk()*10)); o.hp-=dmg; if(o.hp<=0){ onOreBroken(idx, o); } }
           SFX.skill(); break;
       }
       setCd(key, sk.cd);
       renderSkillBar(); renderGrid(); renderTop();
     }
 
-    // ---------- Dungeon ----------
-    function floorHpMul(){ return 1 + 0.25*(state.floor-1); }
-    function floorValMul(){ return 1 + 0.15*(state.floor-1); }
+    function floorHpMul(){ return 1 + 0.18*(state.floor-1); }
+    function floorValMul(){ return 1 + 0.12*(state.floor-1); }
 
     function startRun(){ if(state.inRun) return; state.inRun = true; state.etherSpawned=false; state.timeLeft = 20; state.grid = new Array(25).fill(null); for(const o of ORES){ state.loot[o.key]=0; } Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]); restartSpawnTimer(); state.runStartTs = performance.now(); startTick(); spawnPets(); renderSkillBar(); refresh(); }
 
@@ -530,7 +524,6 @@
         if(!state.inRun) return;
         const now = performance.now();
         const elapsed = (now - state.runStartTs)/1000;
-        // Ether spawn time: base 10 + floor*0.5 (cap +20) - aether haste, min 5s
         let etherDelay = 10 + Math.min(state.floor*0.5, 20) - (state.aether?.etherHaste||0);
         etherDelay = Math.max(5, etherDelay);
         if(!state.etherSpawned && elapsed >= etherDelay){ spawnEther(); }
@@ -552,7 +545,6 @@
     function exitRun(){ if(!state.inRun) return; bankAndExit(false); }
 
     function bankAndExit(cleared){
-      // 자동판매가 켜져 있으면 전리품을 골드로 정산, 아니면 인벤토리로 이관
       if(state.settings?.autoSell){
         let totalGold = 0;
         for(const k in state.loot){
@@ -565,7 +557,6 @@
       } else {
         for(const k in state.loot){ state.inventory[k] = (state.inventory[k]||0) + state.loot[k]; }
       }
-      // 전리품 초기화
       for(const k in state.loot){ state.loot[k]=0; }
       state.inRun=false; clearInterval(state.timers.spawn); clearInterval(state.timers.tick);
       state.pets=[]; state.lastAnimTs=0; state.grid = new Array(25).fill(null);
@@ -589,7 +580,6 @@
       renderGrid();
     }
 
-    // Ether boss HP quadratic scaling
     function spawnEther(){ const idx = 12; state.etherSpawned = true; 
       const baseE = 250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
       const hp = Math.round(baseE * Math.pow(1+r, exp));
@@ -597,7 +587,6 @@
 
     function onOreBroken(idx, ore){
       if(ore.type==='EtherOre'){ state.player.ether += 10; toast('✨ 에테르 +10'); state.grid[idx] = null; SFX.break(); bankAndExit(true); return; }
-      // 던전 중에는 항상 임시 전리품(loot)에 적립
       state.loot[ore.type] = (state.loot[ore.type]||0)+1;
       state.grid[idx] = null;
       state.timeLeft = Math.min(20, +(state.timeLeft + 0.1).toFixed(1));
@@ -607,7 +596,7 @@
 
     function hit(idx, source='tap'){
       if(!state.inRun) return; const ore = state.grid[idx]; if(!ore) return;
-      let dmg = calcAtk() * (state.skillAtkBuffUntil>performance.now()?2:1);
+      let dmg = Math.round(calcAtk() * (state.skillAtkBuffUntil>performance.now()?2:1));
       const crit = (Math.random() < state.player.critChance && source==='tap');
       if(crit) dmg = Math.floor(dmg * state.player.critMult);
       ore.hp -= dmg;
@@ -618,7 +607,6 @@
       renderGrid();
     }
 
-    // ---------- Pointer (slide mining) ----------
     function onPointerDown(e){ e.preventDefault(); trackPointer(e, true); }
     function onPointerMove(e){ e.preventDefault(); trackPointer(e, false); }
     function onPointerUp(e){ const ps = state.pointerState[e.pointerId]; if(ps) delete state.pointerState[e.pointerId]; }
@@ -629,12 +617,10 @@
     gridEl.addEventListener('pointerup', onPointerUp, {passive:false});
     gridEl.addEventListener('pointercancel', onPointerUp, {passive:false});
 
-    // ---------- Pull-to-Refresh guard ----------
     let startY = 0, atTop = false;
     document.addEventListener('touchstart', (e)=>{ startY = e.touches[0].clientY; atTop = (document.scrollingElement?.scrollTop || 0) <= 0; }, {passive:true});
     document.addEventListener('touchmove', (e)=>{ if(atTop){ const dy = e.touches[0].clientY - startY; if(dy > 5) e.preventDefault(); } }, {passive:false});
 
-    // ---------- Pets ----------
     function spawnPets(){
       state.pets = [];
       const count = (state.upgrades.pet.level || 0) + (state.passive.petPlus || 0) + (state.aether?.petPlus||0);
@@ -649,7 +635,6 @@
       for(const p of state.pets){ p.x += p.vx*dt; p.y += p.vy*dt; p.x = Math.max(gr.left+8, Math.min(gr.right-8, p.x)); p.y = Math.max(gr.top+8, Math.min(gr.bottom-8, p.y)); if(p.targetIdx>=0){ const c=cellCenter(p.targetIdx); const dist=Math.hypot(c.x-p.x, c.y-p.y); p.cd -= dt; if(dist<=PET.atkRange && p.cd<=0){ p.cd = PET.atkInterval; hit(p.targetIdx,'pet'); } } }
       renderPets(); requestAnimationFrame(petsFrame); }
 
-    // ---------- Tabs & Events ----------
     document.querySelectorAll('.tab-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         SFX.ui();
@@ -685,7 +670,6 @@
     });
     document.getElementById('rebirthBuyBtn').addEventListener('click', ()=>{
       if(state.highestFloor < 20) return;
-      // compute total
       let total = 0;
       const chosen = [];
       for(const p of REBIRTH_PERKS){
@@ -698,10 +682,8 @@
       if(total<=0) return;
       if(state.player.ether < total) return toast('에테르 부족');
       if(!confirm('선택한 보너스를 구매하고 환생하시겠습니까?')) return;
-      // pay & apply
       state.player.ether -= total;
       for(const p of chosen){ p.apply(); }
-      // perform rebirth
       if(state.inRun) bankAndExit(false);
       state.floor = 1; state.aether.rebirths = (state.aether.rebirths||0)+1;
       for(const k in rebirthPick){ delete rebirthPick[k]; }
@@ -715,13 +697,12 @@
       }
     });
 
-    // ---------- Boot ----------
     function boot(){ load(); renderGrid(); renderInventory(); renderUpgrades(); renderSkills(); renderAether(); renderTop(); renderSkillBar(); }
     boot();
 
-    // ---------- Utils ----------
     function toast(msg){ const t=document.createElement('div'); t.textContent=msg; Object.assign(t.style,{position:'fixed',left:'50%',top:'14%',transform:'translateX(-50%)',background:'#11193a',border:'1px solid #263165',padding:'10px 14px',borderRadius:'12px',color:'#eaf2ff',zIndex:9999}); document.body.appendChild(t); setTimeout(()=>t.remove(),1100); }
     function refresh(){ renderTop(); renderGrid(); renderInventory(); renderUpgrades(); }
+
   })();
   </script>
 </body>
