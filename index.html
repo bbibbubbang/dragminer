@@ -319,7 +319,7 @@
       { key:'Stone',   name:'석재',     color:'#a3a3a3', hp:  60,  value: 1,  weight: 40, tier:1, minFloor:1 },
       { key:'Copper',  name:'구리',     color:'#ef9a9a', hp: 120,  value: 2,  weight: 36, tier:1, minFloor:1 },
       { key:'Iron',    name:'철',       color:'#90caf9', hp: 220,  value: 4,  weight: 30, tier:2, minFloor:2 },
-      { key:'Silver',  name:'은',       color:'#cfd8dc', hp: 380,  value: 9,  weight: 22, tier:3, minFloor:3 },
+        { key:'Silver',  name:'은',       color:'#cfd8dc', hp: 380,  value: 9,  weight: 22, tier:3, minFloor:1 },
       { key:'Gold',    name:'금',       color:'#f6e05e', hp: 650,  value: 20, weight: 16, tier:3, minFloor:5 },
       { key:'Platinum',name:'백금',     color:'#e5e7eb', hp: 900,  value: 32, weight: 10, tier:4, minFloor:8 },
       { key:'Sapphire',name:'사파이어', color:'#60a5fa', hp:1200,  value: 48, weight: 7,  tier:4, minFloor:10 },
@@ -338,15 +338,17 @@
     const skillBarEl = $('#skillBar');
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
-    function eligibleOresForFloor(f){
-      const luck = state.aether?.luck||0;
-      return ORES.filter(o=> f >= o.minFloor).map(o=>{
-        const bonus = Math.max(0, f - o.minFloor);
-        const tierBoost = 1 + (o.tier-1)*0.03*bonus;
-        const rareMul = 1 + luck*0.08*(o.tier-1);
-        return { ...o, weight: Math.max(1, Math.round(o.weight * tierBoost * rareMul)) };
-      });
-    }
+      function eligibleOresForFloor(f){
+        const luck = state.aether?.luck||0;
+        return ORES.filter(o=> f >= o.minFloor).map(o=>{
+          const bonus = Math.max(0, f - o.minFloor);
+          const tierBoost = 1 + (o.tier-1)*0.03*bonus;
+          const rareMul = 1 + luck*0.08*(o.tier-1);
+          let weight = o.weight * tierBoost * rareMul;
+          if(o.key==='Silver' && f<3){ weight *= (f===1 ? 0.1 : 0.3); }
+          return { ...o, weight: Math.max(1, Math.round(weight)) };
+        });
+      }
     function cellIndexFromPoint(x,y){ const el = document.elementFromPoint(x,y); const cell = el && el.closest ? el.closest('.cell') : null; return cell? +cell.dataset.idx : -1; }
     function gridRect(){ return gridEl.getBoundingClientRect(); }
     function cellRect(idx){ return gridEl.children[idx].getBoundingClientRect(); }
@@ -618,10 +620,10 @@
       renderGrid();
     }
 
-    function spawnEther(){ const idx = 12; state.etherSpawned = true; 
-      const baseE = 2500; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
-      const hp = Math.round(baseE * Math.pow(1+r, exp));
-      state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7' }; renderGrid(); }
+      function spawnEther(){ const idx = 12; state.etherSpawned = true;
+        const baseE = 1250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
+        const hp = Math.round(baseE * Math.pow(1+r, exp));
+        state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7' }; renderGrid(); }
 
     function onOreBroken(idx, ore){
       if(ore.type==='EtherOre'){ state.player.ether += 10; toast('✨ 에테르 +10'); state.grid[idx] = null; SFX.break(); bankAndExit(true); return; }
