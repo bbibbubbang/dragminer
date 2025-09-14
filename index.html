@@ -576,9 +576,9 @@
       restartSpawnTimer();
       state.runStartTs = performance.now();
       startTick();
-      spawnPets();
       renderSkillBar();
       gridRectCache = null;
+      spawnPets();
       refresh();
     }
 
@@ -801,6 +801,12 @@
 
     function boot(){ load(); renderGrid(); renderInventory(); renderUpgrades(); renderSkills(); renderAether(); renderTop(); renderSkillBar(); }
     boot();
+
+    window.addEventListener('resize', ()=>{
+      gridRectCache = null;
+      renderGrid();
+      if(state.inRun) spawnPets();
+    });
 
     function toast(msg){ const t=document.createElement('div'); t.textContent=msg; Object.assign(t.style,{position:'fixed',left:'50%',top:'14%',transform:'translateX(-50%)',background:'#11193a',border:'1px solid #263165',padding:'10px 14px',borderRadius:'12px',color:'#eaf2ff',zIndex:9999}); document.body.appendChild(t); setTimeout(()=>t.remove(),1100); }
     function refresh(){ renderTop(); renderGrid(); renderInventory(); renderUpgrades(); }
