@@ -211,7 +211,7 @@
 
     // ---------- Game State ----------
     const state = {
-      player: { atkBase: 1, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
+      player: { atkBase: 10, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
       upgrades: {
         atk:   { level: 1, baseCost: 30,  scale: 1.35 },
         crit:  { level: 0, baseCost: 50,  scale: 1.7  },
@@ -282,7 +282,7 @@
         state.aether = s.aether || state.aether;
         state.settings = s.settings || state.settings;
         if(typeof state.player.atkBase === 'undefined'){
-          state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 1;
+          state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 10;
         }
       }catch(e){ console.warn('load failed', e); }
     }
@@ -296,7 +296,7 @@
       { key:'sonic',    name:'초음파',   desc:'가까운 광석에 즉시 큰 피해', ae:130, cd:18 },
     ];
     const PASSIVE_SKILLS = [
-      { key:'power',   name:'강화 채굴',  desc:'공격력 +1(기초)',            ae:120, once:true,  apply(){ state.player.atkBase = (state.player.atkBase||1) + 1; } },
+      { key:'power',   name:'강화 채굴',  desc:'공격력 +1(기초)',            ae:120, once:true,  apply(){ state.player.atkBase = (state.player.atkBase||10) + 1; } },
       { key:'sharp',   name:'예리함',    desc:'치명타 확률 +3% (최대 50%)',   ae:150, once:true,  apply(){ state.player.critChance = Math.min(0.5, state.player.critChance + 0.03); } },
       { key:'merchant',name:'상인 감각',  desc:'판매가 +10%',                 ae:180, once:false, apply(){ state.passive.sellBonus += 0.10; } },
       { key:'petmaster',name:'펫 조련',  desc:'펫 +1',                      ae:200, once:false, apply(){ state.passive.petPlus += 1; if(state.inRun) spawnPets(); } },
@@ -313,17 +313,17 @@
 
     // ---------- Ores ----------
     const ORES = [
-      { key:'Stone',   name:'석재',     color:'#a3a3a3', hp:  6, value: 1,  weight: 40, tier:1, minFloor:1 },
-      { key:'Copper',  name:'구리',     color:'#ef9a9a', hp: 12, value: 2,  weight: 36, tier:1, minFloor:1 },
-      { key:'Iron',    name:'철',       color:'#90caf9', hp: 22, value: 4,  weight: 30, tier:2, minFloor:2 },
-      { key:'Silver',  name:'은',       color:'#cfd8dc', hp: 38, value: 9,  weight: 22, tier:3, minFloor:3 },
-      { key:'Gold',    name:'금',       color:'#f6e05e', hp: 65, value: 20, weight: 16, tier:3, minFloor:5 },
-      { key:'Platinum',name:'백금',     color:'#e5e7eb', hp: 90, value: 32, weight: 10, tier:4, minFloor:8 },
-      { key:'Sapphire',name:'사파이어', color:'#60a5fa', hp:120, value: 48, weight: 7,  tier:4, minFloor:10 },
-      { key:'Ruby',    name:'루비',     color:'#f43f5e', hp:140, value: 60, weight: 6,  tier:5, minFloor:12 },
-      { key:'Emerald', name:'에메랄드', color:'#34d399', hp:165, value: 80, weight: 5,  tier:5, minFloor:15 },
-      { key:'Mythril', name:'미스릴',   color:'#93c5fd', hp:220, value:120, weight: 3,  tier:6, minFloor:18 },
-      { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:300, value:180, weight: 2,  tier:6, minFloor:22 },
+      { key:'Stone',   name:'석재',     color:'#a3a3a3', hp:  60,  value: 1,  weight: 40, tier:1, minFloor:1 },
+      { key:'Copper',  name:'구리',     color:'#ef9a9a', hp: 120,  value: 2,  weight: 36, tier:1, minFloor:1 },
+      { key:'Iron',    name:'철',       color:'#90caf9', hp: 220,  value: 4,  weight: 30, tier:2, minFloor:2 },
+      { key:'Silver',  name:'은',       color:'#cfd8dc', hp: 380,  value: 9,  weight: 22, tier:3, minFloor:3 },
+      { key:'Gold',    name:'금',       color:'#f6e05e', hp: 650,  value: 20, weight: 16, tier:3, minFloor:5 },
+      { key:'Platinum',name:'백금',     color:'#e5e7eb', hp: 900,  value: 32, weight: 10, tier:4, minFloor:8 },
+      { key:'Sapphire',name:'사파이어', color:'#60a5fa', hp:1200,  value: 48, weight: 7,  tier:4, minFloor:10 },
+      { key:'Ruby',    name:'루비',     color:'#f43f5e', hp:1400,  value: 60, weight: 6,  tier:5, minFloor:12 },
+      { key:'Emerald', name:'에메랄드', color:'#34d399', hp:1650,  value: 80, weight: 5,  tier:5, minFloor:15 },
+      { key:'Mythril', name:'미스릴',   color:'#93c5fd', hp:2200,  value:120, weight: 3,  tier:6, minFloor:18 },
+      { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:3000,  value:180, weight: 2,  tier:6, minFloor:22 },
     ];
 
     for(const o of ORES){ state.inventory[o.key]=state.inventory[o.key]||0; state.loot[o.key]=0; state.upgrades.oreMul[o.key]=state.upgrades.oreMul[o.key]||0; }
@@ -359,7 +359,7 @@
 
     function calcAtk() {
       const L = state.upgrades.atk?.level || 1;
-      const base = state.player.atkBase || 1;
+      const base = state.player.atkBase || 10;
       const ATK_PER_LVL = 0.12;
       const ATK_MILE    = 0.35;
       const per   = Math.pow(1 + ATK_PER_LVL, Math.max(0, L - 1));
@@ -596,7 +596,7 @@
     }
 
     function spawnEther(){ const idx = 12; state.etherSpawned = true; 
-      const baseE = 250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
+      const baseE = 2500; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
       const hp = Math.round(baseE * Math.pow(1+r, exp));
       state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7' }; renderGrid(); }
 
