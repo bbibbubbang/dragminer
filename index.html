@@ -565,22 +565,7 @@
     function floorHpMul(){ return 1 + 0.18*(state.floor-1); }
     function floorValMul(){ return 1 + 0.12*(state.floor-1); }
 
-    function startRun(){
-      if(state.inRun) return;
-      state.inRun = true;
-      state.etherSpawned = false;
-      state.timeLeft = 20;
-      state.grid = new Array(25).fill(null);
-      for(const o of ORES){ state.loot[o.key]=0; }
-      Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]);
-      renderSkillBar();
-      gridRectCache = null;
-      spawnPets();
-      restartSpawnTimer();
-      state.runStartTs = performance.now();
-      startTick();
-      refresh();
-    }
+    function startRun(){ if(state.inRun) return; state.inRun = true; state.etherSpawned=false; state.timeLeft = 20; state.grid = new Array(25).fill(null); for(const o of ORES){ state.loot[o.key]=0; } Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]); restartSpawnTimer(); state.runStartTs = performance.now(); startTick(); spawnPets(); renderSkillBar(); refresh(); }
 
     function startTick(){
       clearInterval(state.timers.tick);
@@ -625,10 +610,7 @@
       state.inRun=false; clearInterval(state.timers.spawn); clearInterval(state.timers.tick);
       state.pets=[]; state.lastAnimTs=0; state.grid = new Array(25).fill(null);
       if(cleared){ state.floor++; if(state.floor>state.highestFloor) state.highestFloor=state.floor; }
-      renderSkillBar();
-      gridRectCache = null;
-      save();
-      refresh();
+      save(); refresh(); renderSkillBar();
       if(cleared && state.aether?.autoAdvanceOwned && state.aether.autoAdvanceEnabled){
         setTimeout(()=>{ startRun(); }, 250);
       }
