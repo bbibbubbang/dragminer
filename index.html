@@ -357,13 +357,25 @@
     function gridRect(){
       const r = gridEl.getBoundingClientRect();
       if(r.width && r.height){
-        if(!gridRectCache){
-          gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
-        } else {
-          const width = Math.max(gridRectCache.width, r.width);
-          const height = Math.max(gridRectCache.height, r.height);
-          gridRectCache = {left:r.left, top:r.top, width, height, right:r.left + width, bottom:r.top + height};
+        if(gridRectCache){
+          const sx = r.width / gridRectCache.width;
+          const sy = r.height / gridRectCache.height;
+          const left = gridRectCache.left;
+          const top = gridRectCache.top;
+          const changed = sx!==1 || sy!==1 || r.left!==left || r.top!==top;
+          if(changed){
+            for(const ore of state.grid){
+              if(!ore) continue;
+              ore.x = (ore.x - left) * sx + r.left;
+              ore.y = (ore.y - top) * sy + r.top;
+            }
+            for(const pet of state.pets){
+              pet.x = (pet.x - left) * sx + r.left;
+              pet.y = (pet.y - top) * sy + r.top;
+            }
+          }
         }
+        gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
       }
       return gridRectCache || {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
     }
@@ -808,9 +820,8 @@
     boot();
 
     window.addEventListener('resize', ()=>{
-      gridRectCache = null;
+      gridRect();
       renderGrid();
-      if(state.inRun) spawnPets();
     });
 
     function toast(msg){ const t=document.createElement('div'); t.textContent=msg; Object.assign(t.style,{position:'fixed',left:'50%',top:'14%',transform:'translateX(-50%)',background:'#11193a',border:'1px solid #263165',padding:'10px 14px',borderRadius:'12px',color:'#eaf2ff',zIndex:9999}); document.body.appendChild(t); setTimeout(()=>t.remove(),1100); }
