@@ -244,9 +244,90 @@ section[id^="tab-"].active{ display:block; }
       o.start(t);
       o.stop(t+dur);
     }
+    const HIT_SOUNDS = [
+      'sounds/impactMetal_heavy_000.ogg',
+      'sounds/impactMetal_heavy_001.ogg',
+      'sounds/impactMetal_heavy_002.ogg',
+      'sounds/impactMetal_heavy_003.ogg',
+      'sounds/impactMetal_heavy_004.ogg'
+    ];
+    let hitSoundBuffers = [];
+    let hitSoundPromise = null;
+    function decodeAudio(arrayBuffer){
+      if(!audioCtx) return Promise.resolve(null);
+      if(typeof audioCtx.decodeAudioData !== 'function') return Promise.resolve(null);
+      if(audioCtx.decodeAudioData.length === 1){
+        try{
+          return audioCtx.decodeAudioData(arrayBuffer);
+        }catch(err){
+          return Promise.reject(err);
+        }
+      }
+      return new Promise((resolve, reject)=>{
+        try{
+          audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+        }catch(err){ reject(err); }
+      });
+    }
+    function loadHitSounds(){
+      if(hitSoundBuffers.length) return Promise.resolve(hitSoundBuffers);
+      if(hitSoundPromise) return hitSoundPromise;
+      ensureAudio();
+      hitSoundPromise = Promise.all(HIT_SOUNDS.map(async (url)=>{
+        try{
+          const resp = await fetch(url);
+          if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const buf = await resp.arrayBuffer();
+          return await decodeAudio(buf);
+        }catch(err){
+          console.warn('Failed to load ore hit sound', url, err);
+          return null;
+        }
+      })).then(results=>{
+        hitSoundBuffers = results.filter(Boolean);
+        return hitSoundBuffers;
+      }).catch(err=>{
+        console.warn('Ore hit sound load failed', err);
+        return [];
+      });
+      return hitSoundPromise;
+    }
+    function playBuffer(buffer, gainValue=0.6){
+      if(!buffer || !audioCtx) return;
+      const source = audioCtx.createBufferSource();
+      const gain = audioCtx.createGain();
+      gain.gain.value = gainValue;
+      source.buffer = buffer;
+      source.connect(gain);
+      gain.connect(audioCtx.destination);
+      try{ source.start(); }
+      catch(err){ console.warn('Failed to start buffer', err); }
+    }
+    async function playOreHit(volume=0.65){
+      if(!sfxEnabled) return false;
+      ensureAudio();
+      try{
+        const buffers = await loadHitSounds();
+        if(buffers && buffers.length){
+          const buffer = buffers[Math.floor(Math.random()*buffers.length)];
+          playBuffer(buffer, volume);
+          return true;
+        }
+      }catch(err){
+        console.warn('Ore hit playback failed', err);
+      }
+      return false;
+    }
     const SFX = {
-      hit(){ beep(520,0.03,'square',0.035); },
-      crit(){ beep(900,0.05,'square',0.045); },
+      async hit(){
+        const played = await playOreHit(0.7);
+        if(!played) beep(520,0.03,'square',0.035);
+      },
+      async crit(){
+        const played = await playOreHit(0.75);
+        if(!played) beep(900,0.05,'square',0.045);
+        else beep(900,0.05,'square',0.03);
+      },
       break(){ beep(240,0.07,'sawtooth',0.05); },
       skill(){ beep(700,0.08,'triangle',0.05); },
       deny(){ beep(180,0.12,'square',0.04); },
