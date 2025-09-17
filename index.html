@@ -48,6 +48,9 @@
     .row{display:flex;gap:8px;align-items:center}
     .panel{background:var(--panel);border:1px solid #232844;border-radius:16px;padding:12px}
 
+    .settings-card{background:#0f1430;border:1px solid #273061;border-radius:12px;padding:12px;margin-top:12px}
+    .settings-card h4{margin:0 0 4px 0}
+
     .inventory{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     .inv-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
     .inv-item{background:#0f1430;border:1px solid #1f2853;border-radius:12px;padding:10px}
@@ -202,6 +205,16 @@ section[id^="tab-"].active{ display:block; }
           <button id="fullscreenBtn" class="btn secondary">전체화면</button>
           <button id="toggleSoundBtn" class="btn ghost">효과음: 켜짐</button>
           <button id="resetBtn" class="btn danger">초기화</button>
+        </div>
+        <div class="settings-card" id="playGamesCard">
+          <div class="row" style="justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+            <div>
+              <h4>Google Play 게임즈</h4>
+              <div class="mono" id="playGamesStatus">로그인 상태 확인 중...</div>
+            </div>
+            <button id="playGamesLoginBtn" class="btn" style="min-width:120px">로그인</button>
+          </div>
+          <div class="mono" id="playGamesHelp" style="margin-top:8px;opacity:.72">구글 플레이 게임즈 계정으로 업적과 저장을 연동합니다.</div>
         </div>
       </section>
     </main>
@@ -369,6 +382,179 @@ section[id^="tab-"].active{ display:block; }
     const skillBarEl = $('#skillBar');
     const screenEl = $('.screen');
     let gridRectCache = null;
+
+    const playGamesCardEl = document.getElementById('playGamesCard');
+    const playGamesStatusEl = document.getElementById('playGamesStatus');
+    const playGamesLoginBtn = document.getElementById('playGamesLoginBtn');
+    const playGamesHelpEl = document.getElementById('playGamesHelp');
+
+    const playGamesState = {
+      available:false,
+      signedIn:false,
+      busy:false,
+      canLogin:false,
+      initialized:false,
+      playerName:'',
+      check:null,
+      login:null,
+      bridge:null
+    };
+
+    function parsePlayGamesBool(v){
+      if(typeof v === 'boolean') return v;
+      if(typeof v === 'number') return v !== 0;
+      if(typeof v === 'string'){
+        const norm = v.trim().toLowerCase();
+        if(!norm) return false;
+        if(['true','1','yes','y','signed_in','connected','ok','success','logged_in','login','signedin'].includes(norm)) return true;
+        if(['false','0','no','n','signed_out','disconnected','fail','failed','error','logged_out','logout','signedout','not_signed_in','not signed in','not_signedin'].includes(norm)) return false;
+        if(norm.includes('required') || norm.includes('sign_out') || norm.includes('signed_out') || norm.includes('logout')) return false;
+        if((norm.includes('signed_in') || norm.includes('sign_in')) && !norm.includes('required')) return true;
+      }
+      return !!v;
+    }
+
+    function parsePlayGamesPayload(payload){
+      if(typeof payload === 'string'){
+        const parts = payload.split(/[|,:]/).map(s=>s.trim()).filter(Boolean);
+        if(parts.length>1){
+          return { signedIn: parsePlayGamesBool(parts[0]), name: parts.slice(1).join(' ') };
+        }
+        return { signedIn: parsePlayGamesBool(payload) };
+      }
+      if(typeof payload === 'object' && payload){
+        const keys = ['signedIn','isSignedIn','loggedIn','isLoggedIn','success','status','state'];
+        let signed;
+        for(const k of keys){
+          if(Object.prototype.hasOwnProperty.call(payload,k)){
+            signed = payload[k];
+            break;
+          }
+        }
+        if(typeof signed === 'string'){
+          const lower = signed.trim().toLowerCase();
+          if(lower){
+            if(lower.includes('required') || lower.includes('fail') || lower.includes('error') || lower.includes('denied') || lower.includes('sign_out') || lower.includes('signed_out') || lower.includes('logout')) signed = false;
+            else if(lower.includes('signed_in') || lower.includes('sign_in') || lower.includes('connected') || lower.includes('success') || lower.includes('authorized') || lower.includes('granted') || lower === 'ok') signed = true;
+          }
+        }
+        const name = payload.displayName || payload.playerName || payload.name || payload.nickname;
+        return { signedIn: typeof signed === 'undefined' ? undefined : parsePlayGamesBool(signed), name: name? String(name) : undefined };
+      }
+      if(typeof payload === 'undefined') return { signedIn: undefined };
+      return { signedIn: parsePlayGamesBool(payload) };
+    }
+
+    function updatePlayGamesUI(){
+      if(!playGamesCardEl) return;
+      if(playGamesStatusEl){
+        if(!playGamesState.available){
+          playGamesStatusEl.textContent = 'Android 앱에서만 지원됩니다.';
+        } else if(!playGamesState.initialized){
+          playGamesStatusEl.textContent = '로그인 상태 확인 중...';
+        } else if(playGamesState.signedIn){
+          playGamesStatusEl.textContent = playGamesState.playerName ? `로그인됨 (${playGamesState.playerName})` : '로그인됨';
+        } else {
+          playGamesStatusEl.textContent = playGamesState.busy ? '로그인 중...' : '로그인 필요';
+        }
+      }
+      if(playGamesHelpEl){
+        if(!playGamesState.available){
+          playGamesHelpEl.textContent = 'Android WebView 앱에서 플레이 게임즈 연동 시 표시됩니다.';
+        } else if(playGamesState.signedIn){
+          playGamesHelpEl.textContent = '플레이 게임즈에 연결되었습니다.';
+        } else if(playGamesState.canLogin){
+          playGamesHelpEl.textContent = '구글 플레이 게임즈 계정으로 업적과 저장을 연동합니다.';
+        } else {
+          playGamesHelpEl.textContent = '로그인은 앱에서만 지원됩니다.';
+        }
+      }
+      if(playGamesLoginBtn){
+        const showBtn = playGamesState.available && playGamesState.canLogin && playGamesState.initialized && !playGamesState.signedIn;
+        playGamesLoginBtn.style.display = showBtn ? 'inline-flex' : 'none';
+        playGamesLoginBtn.disabled = playGamesState.busy;
+        playGamesLoginBtn.textContent = playGamesState.busy ? '로그인 중...' : '로그인';
+      }
+    }
+
+    function setPlayGamesState(payload){
+      const parsed = parsePlayGamesPayload(payload);
+      playGamesState.available = true;
+      playGamesState.initialized = true;
+      if(typeof parsed.signedIn !== 'undefined'){
+        playGamesState.signedIn = !!parsed.signedIn;
+        if(!playGamesState.signedIn && !parsed.name) playGamesState.playerName = '';
+      }
+      if(parsed.name){
+        playGamesState.playerName = parsed.name;
+      } else if(!playGamesState.signedIn){
+        playGamesState.playerName = '';
+      }
+      playGamesState.busy = false;
+      updatePlayGamesUI();
+    }
+
+    function detectPlayGamesBridge(){
+      const candidates = [
+        window.PlayGames,
+        window.playGames,
+        window.Android && window.Android.PlayGames,
+        window.Android
+      ].filter(Boolean);
+      for(const cand of candidates){
+        if(!cand) continue;
+        const checkNames = ['isPlayGamesSignedIn','isPlayGamesLoggedIn','playGamesIsSignedIn','getPlayGamesLoginState','getPlayGamesSignedIn','fetchPlayGamesLoginState','isSignedIn','isSignedInPlayGames'];
+        let check = null;
+        for(const name of checkNames){
+          if(typeof cand[name] === 'function'){ check = cand[name].bind(cand); break; }
+          if(typeof cand[name] !== 'undefined'){ check = ()=> cand[name]; break; }
+        }
+        const loginNames = ['signInPlayGames','signInToPlayGames','playGamesSignIn','startPlayGamesLogin','loginPlayGames','loginToPlayGames','playGamesLogin','requestPlayGamesSignIn','triggerPlayGamesLogin'];
+        let login = null;
+        for(const name of loginNames){
+          if(typeof cand[name] === 'function'){ login = cand[name].bind(cand); break; }
+        }
+        if(check || login){
+          playGamesState.bridge = cand;
+          playGamesState.check = check;
+          playGamesState.login = login;
+          playGamesState.canLogin = !!login;
+          if(!check && login && !playGamesState.initialized){
+            playGamesState.initialized = true;
+            playGamesState.signedIn = false;
+          }
+          playGamesState.available = true;
+          updatePlayGamesUI();
+          return true;
+        }
+      }
+      if(!playGamesState.available){
+        playGamesState.check = null;
+        playGamesState.login = null;
+        playGamesState.canLogin = false;
+      }
+      updatePlayGamesUI();
+      return false;
+    }
+
+    function refreshPlayGamesStatus(){
+      if(!playGamesState.check){ updatePlayGamesUI(); return; }
+      try{
+        const res = playGamesState.check();
+        if(res && typeof res.then === 'function'){
+          res.then(val=>{ setPlayGamesState(val); }).catch(err=>{ console.warn('Play Games 상태 확인 실패', err); });
+        } else if(typeof res !== 'undefined'){
+          setPlayGamesState(res);
+        }
+      }catch(err){ console.warn('Play Games 상태 확인 중 오류', err); }
+    }
+
+    window.__setPlayGamesLoginState = setPlayGamesState;
+    window.__playGamesLoginState = setPlayGamesState;
+    window.onPlayGamesLoginState = setPlayGamesState;
+    window.PlayGamesLoginState = setPlayGamesState;
+    window.updatePlayGamesLoginState = setPlayGamesState;
+    window.requestPlayGamesStatus = refreshPlayGamesStatus;
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
       function eligibleOresForFloor(f){
@@ -764,6 +950,7 @@ section[id^="tab-"].active{ display:block; }
         if(t==='skills') renderSkills();
         if(t==='aether') renderAether();
         if(t==='inventory') renderInventory();
+        if(t==='settings'){ detectPlayGamesBridge(); refreshPlayGamesStatus(); updatePlayGamesUI(); }
       })
     });
     $('#toggleRunBtn').addEventListener('click', ()=>{ ensureAudio(); SFX.ui(); startRun(); });
@@ -772,6 +959,38 @@ section[id^="tab-"].active{ display:block; }
     $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 전체 초기화할까요? (세이브 전부 삭제)')){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} try{ LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){} location.reload(); } });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
     $('#toggleSoundBtn').addEventListener('click', ()=>{ SFX.ui(); sfxEnabled=!sfxEnabled; $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`; });
+
+    if(playGamesLoginBtn){
+      playGamesLoginBtn.addEventListener('click', ()=>{
+        SFX.ui();
+        if(!playGamesState.login){ toast('Android 앱에서만 지원됩니다.'); return; }
+        playGamesState.busy = true;
+        updatePlayGamesUI();
+        try{
+          const res = playGamesState.login();
+          if(res && typeof res.then === 'function'){
+            res.then(val=>{
+              if(typeof val !== 'undefined') setPlayGamesState(val);
+              else refreshPlayGamesStatus();
+            }).catch(err=>{
+              console.warn('Play Games 로그인 실패', err);
+              playGamesState.busy = false;
+              updatePlayGamesUI();
+            });
+          } else if(typeof res !== 'undefined'){
+            setPlayGamesState(res);
+          } else {
+            setTimeout(()=>{ refreshPlayGamesStatus(); }, 1000);
+          }
+        }catch(err){
+          console.warn('Play Games 로그인 중 오류', err);
+          playGamesState.busy = false;
+          updatePlayGamesUI();
+        }
+        setTimeout(()=>{ if(playGamesState.busy) refreshPlayGamesStatus(); }, 1800);
+        setTimeout(()=>{ if(playGamesState.busy){ playGamesState.busy = false; updatePlayGamesUI(); } }, 5000);
+      });
+    }
 
     // Export / Import for backup/move domains
     document.getElementById('exportBtn').addEventListener('click', ()=>{
@@ -832,7 +1051,20 @@ section[id^="tab-"].active{ display:block; }
       }
     });
 
-    function boot(){ load(); renderGrid(); renderInventory(); renderUpgrades(); renderSkills(); renderAether(); renderTop(); renderSkillBar(); }
+    function boot(){
+      load();
+      detectPlayGamesBridge();
+      updatePlayGamesUI();
+      refreshPlayGamesStatus();
+      setTimeout(()=>{ if(!playGamesState.available){ detectPlayGamesBridge(); } if(playGamesState.check){ refreshPlayGamesStatus(); } }, 1200);
+      renderGrid();
+      renderInventory();
+      renderUpgrades();
+      renderSkills();
+      renderAether();
+      renderTop();
+      renderSkillBar();
+    }
     boot();
 
     window.addEventListener('resize', ()=>{
