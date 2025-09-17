@@ -1,0 +1,6 @@
+<!-- Merge into AndroidManifest.xml -->
+<uses-permission android:name="android.permission.INTERNET" />
+<application
+    android:usesCleartextTraffic="false"
+    android:supportsRtl="true">
+</application>

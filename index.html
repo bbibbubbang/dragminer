@@ -72,11 +72,41 @@
 
     footer{padding:8px 0}
     #ad-container{min-height:90px;display:flex;justify-content:center;align-items:center;width:100%}
-  </style>
+  
+/* --- Sticky header, stable UI, centered grid --- */
+header{ position: sticky; top:0; z-index:3000; }
+#ad-container{ width:100%; min-height:90px; display:flex; align-items:center; justify-content:center; }
+
+/* Never allow accidental blur/fade of UI in any viewer */
+body, .app, .screen, header, .tabs, .grid-wrap, .grid, button, .btn, .tab-btn{ filter:none !important; opacity:1 !important; }
+
+/* Make grid container center its content; grid itself will be pixel-locked by JS */
+.grid-wrap{ position:relative; flex:1; display:flex; flex-direction:column; min-height:0; }
+.grid{ margin:0 auto; flex:none; }
+
+
+/* --- Stable tabs: no display:none to prevent dungeon shrink --- */
+
+
+
+/* --- Safer tab visibility (prevent overlap) --- */
+
+/* Keep dungeon laid out even when hidden to avoid shrink on re-show */
+
+
+
+/* --- FIX: real tab sections visibility --- */
+section[id^="tab-"]{ display:none; }
+section[id^="tab-"].active{ display:block; }
+#tab-dungeon.active{ display:flex; } /* dungeon keeps flex */
+
+</style>
 </head>
 <body>
   <div class="app">
     <header>
+      <div id="ad-container"><!-- Google AdSense --></div>
+
       <div class="topbar">
         <div class="hud mono">
           <div class="hud-line" id="hud1">💰 0 · ✨ 0</div>
@@ -89,7 +119,7 @@
       </div>
       <div class="timerbar"><div id="timeFill"></div></div>
       <div class="tabs">
-        <button class="tab-btn active" data-tab="dungeon">⛏️ 던전</button>
+        <button class="tab-btn" data-tab="dungeon">⛏️ 던전</button>
         <button class="tab-btn" data-tab="inventory">🎒 인벤토리</button>
         <button class="tab-btn" data-tab="upgrades">📈 업그레이드</button>
         <button class="tab-btn" data-tab="skills">🪄 스킬</button>
@@ -109,7 +139,7 @@
         </div>
       </section>
 
-      <section id="tab-inventory" class="panel" style="display:none">
+      <section id="tab-inventory" class="panel" >
         <div class="inv-actions">
           <div class="row" style="gap:8px">
             <input type="checkbox" id="autoSellChkInv" style="width:18px;height:18px">
@@ -120,11 +150,11 @@
         <div class="inventory" id="inventoryList"></div>
       </section>
 
-      <section id="tab-upgrades" class="panel" style="display:none">
+      <section id="tab-upgrades" class="panel" >
         <div id="upgrades"></div>
       </section>
 
-      <section id="tab-skills" class="panel" style="display:none">
+      <section id="tab-skills" class="panel" >
         <div class="row" style="justify-content:space-between;align-items:flex-end">
           <div class="row"><span>액티브 슬롯:</span> <b id="slotCount" class="mono">0/5</b></div>
         </div>
@@ -135,7 +165,7 @@
         <div class="skillshop" id="skillShopPassive"></div>
       </section>
 
-      <section id="tab-aether" class="panel" style="display:none">
+      <section id="tab-aether" class="panel" >
         <div class="row" style="justify-content:space-between">
           <div class="mono">에테르: <b id="aeBalance">0</b></div>
           <div class="mono">환생: <b id="rebirths">0회</b></div>
@@ -164,7 +194,7 @@
         </div>
       </section>
 
-      <section id="tab-settings" class="panel" style="display:none">
+      <section id="tab-settings" class="panel" >
         <div class="row" style="flex-wrap:wrap;gap:10px">
           <button id="saveBtn" class="btn secondary">수동 저장</button>
           <button id="exportBtn" class="btn secondary">내보내기</button>
@@ -176,9 +206,7 @@
       </section>
     </main>
 
-    <footer>
-      <div id="ad-container"><!-- Google AdSense --></div>
-    </footer>
+    
   </div>
 
   <script>
@@ -818,5 +846,197 @@
 
   })();
   </script>
+<script>
+// === Dungeon pixel hard-lock: measure once, pin width/height in px (never shrink until reload) ===
+(function(){
+  const KEY = 'GRID_PIXEL_LOCK';
+  const grid = document.getElementById('grid');
+  const gridWrap = grid ? grid.parentElement : null;
+  const header = document.querySelector('header');
+  if (!grid || !gridWrap) return;
+
+  function bodyBG(){
+    const c = getComputedStyle(document.body).backgroundColor;
+    return (!c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)') ? '#111' : c;
+  }
+  // Ensure banner/heading area is opaque without changing theme
+  try{
+    const h = header;
+    const ad = document.getElementById('ad-container');
+    const bg = bodyBG();
+    if (h) h.style.backgroundColor = bg;
+    if (ad) ad.style.backgroundColor = bg;
+  }catch(e){}
+
+  function measurePX(){
+    // Use the visible .grid-wrap box (more stable than viewport values)
+    const r = gridWrap.getBoundingClientRect();
+    // Leave a small safety padding to avoid accidental overflow
+    const pad = 8;
+    const s = Math.floor(Math.max(200, Math.min(r.width, r.height) - pad));
+    return s;
+  }
+  function apply(px){
+    grid.style.width  = px + 'px';
+    grid.style.height = px + 'px';
+    grid.style.minWidth  = px + 'px';
+    grid.style.minHeight = px + 'px';
+    grid.style.maxWidth  = px + 'px';
+    grid.style.maxHeight = px + 'px';
+  }
+
+  let lock = +(sessionStorage.getItem(KEY) || 0);
+
+  function ensureLock(){
+    if (!lock){
+      // Two rAF to ensure layouts (ads, sticky header) have settled
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        lock = measurePX();
+        sessionStorage.setItem(KEY, String(lock));
+        apply(lock);
+      }));
+    } else {
+      apply(lock);
+    }
+  }
+
+  // Apply immediately at DOM ready if dungeon is initially visible
+  function dungeonVisible(){
+    const el = document.getElementById('tab-dungeon');
+    return el && el.style.display !== 'none';
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{
+    if (dungeonVisible()){
+      ensureLock();
+    }
+  });
+
+  // On tab click: if switching to dungeon, scroll to top and enforce lock
+  document.addEventListener('click', function(e){
+    const btn = e.target && e.target.closest && e.target.closest('.tab-btn');
+    if (!btn) return;
+    const t = btn.getAttribute('data-tab');
+    if (t === 'dungeon'){
+      try{ document.scrollingElement.scrollTop = 0; }catch(_){}
+      const s = document.querySelector('.screen'); if (s) s.scrollTop = 0;
+      ensureLock();
+    }
+  }, true);
+
+  // Ignore resizes (no shrink), but if there was no lock yet and things just became visible, allow first lock
+  window.addEventListener('resize', ()=>{
+    if (!lock) ensureLock(); else apply(lock);
+  }, {passive:true});
+})();
+</script>
+<script>
+function openTab(id){
+  document.querySelectorAll('.tab').forEach(t=> t.classList.remove('active'));
+  const el = (typeof id === 'string') ? document.getElementById(id) : id;
+  if (el) el.classList.add('active');
+  try{ document.scrollingElement.scrollTop = 0; }catch(e){}
+  const s = document.querySelector('.screen'); if (s) s.scrollTop = 0;
+  if (el && el.id === 'tab-dungeon' && typeof resizeDungeon === 'function'){
+    requestAnimationFrame(()=>requestAnimationFrame(()=> resizeDungeon(true)));
+  }
+}
+</script>
+<script>
+// --- Dungeon size lock based on viewport (prevents shrink on tab switches) ---
+(function(){
+  const gridEl = document.getElementById('grid') || document.querySelector('#tab-dungeon .grid') || document.querySelector('#tab-dungeon canvas');
+  const tabDungeon = document.getElementById('tab-dungeon');
+  function headerH(){
+    const h = document.querySelector('header');
+    return h ? h.offsetHeight : 0;
+  }
+  function measure(){
+    const vw = window.innerWidth || document.documentElement.clientWidth || 360;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 640;
+    const availH = Math.max(200, vh - headerH());
+    return Math.floor(Math.min(vw, availH));
+  }
+  let LOCK = 0;
+  window.resizeDungeon = function(allowIncreaseOnly){
+    if (!tabDungeon) return;
+    const size = measure();
+    if (allowIncreaseOnly === true){
+      if (size > LOCK) LOCK = size;
+    } else {
+      LOCK = Math.max(LOCK, size);
+    }
+    const px = LOCK || size;
+    const target = gridEl || tabDungeon;
+    if (target){
+      target.style.width = px + 'px';
+      target.style.height = px + 'px';
+      target.style.maxWidth = px + 'px';
+      target.style.maxHeight = px + 'px';
+      target.style.minWidth = px + 'px';
+      target.style.minHeight = px + 'px';
+      const wrap = target.parentElement;
+      if (wrap && getComputedStyle(wrap).display !== 'flex'){
+        target.style.marginLeft = 'auto';
+        target.style.marginRight = 'auto';
+      }
+    }
+  };
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const active = tabDungeon && tabDungeon.classList.contains('active');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if (active) resizeDungeon(false);
+    }));
+  });
+  window.addEventListener('resize', ()=> resizeDungeon(true), {passive:true});
+})();
+</script>
+
+<script>
+// --- FIX: openTab toggles .active on real sections (ES5) ---
+(function(){
+  function showTab(id){
+    // normalize id: accepts 'dungeon' or 'tab-dungeon'
+    var tid = /^tab-/.test(String(id)) ? String(id) : ('tab-' + String(id));
+    var secs = document.querySelectorAll('section[id^="tab-"]');
+    for (var i=0;i<secs.length;i++){
+      var el = secs[i];
+      if (!el || !el.id) continue;
+      if (el.id === tid){
+        if (!/\bactive\b/.test(el.className)) el.className += ' active';
+      } else {
+        el.className = el.className.replace(/\bactive\b/g, '').trim();
+      }
+    }
+    // scroll top
+    try { document.documentElement.scrollTop = 0; } catch(e){}
+    try { document.body.scrollTop = 0; } catch(e){}
+  }
+
+  window.openTab = function(id){ showTab(id || 'dungeon'); };
+
+  // Ensure initial state: dungeon active
+  function ensureInitial(){
+    var dungeon = document.getElementById('tab-dungeon');
+    if (dungeon && !/\bactive\b/.test(dungeon.className)) {
+      dungeon.className += ' active';
+    }
+    // hide others
+    var secs = document.querySelectorAll('section[id^="tab-"]');
+    for (var i=0;i<secs.length;i++){
+      var el = secs[i];
+      if (el.id !== 'tab-dungeon') {
+        el.className = el.className.replace(/\bactive\b/g, '').trim();
+      }
+    }
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', ensureInitial);
+  } else {
+    ensureInitial();
+  }
+})();
+</script>
+
 </body>
 </html>

@@ -1,0 +1,9 @@
+<!-- settings_snippet.html — paste inside your Settings tab -->
+<div id="pgs-box" style="padding:8px; border:1px solid rgba(255,255,255,0.12); border-radius:8px; margin:8px 0;">
+  <div id="pgs-status">Play Games 상태 확인중…</div>
+  <div id="pgs-actions" style="margin-top:8px;"></div>
+</div>
+<script type="module" src="pgs_integration.js"></script>
+<script>
+  if (window.refreshPgsBox) refreshPgsBox();
+</script>
