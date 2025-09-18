@@ -221,14 +221,72 @@ section[id^="tab-"].active{ display:block; }
 
     
   </div>
-
-  <script src="data/probabilities.js"></script>
+  <script src="data/spawnore" type="text/plain" id="spawnore-data"></script>
   <script src="data/upgrades.js"></script>
   <script src="data/skills.js"></script>
   <script src="data/aether.js"></script>
   <script>
   (()=>{
-    const ORES = window.ORE_DATA;
+
+    const ORES = [
+      { key:'Stone',    name:'석재',     color:'#a3a3a3', hp:  60, value: 1,   tier:1 },
+      { key:'Copper',   name:'구리',     color:'#ef9a9a', hp: 120, value: 2,   tier:1 },
+      { key:'Iron',     name:'철',       color:'#90caf9', hp: 220, value: 4,   tier:2 },
+      { key:'Silver',   name:'은',       color:'#cfd8dc', hp: 380, value: 9,   tier:3 },
+      { key:'Gold',     name:'금',       color:'#f6e05e', hp: 650, value: 20,  tier:3 },
+      { key:'Platinum', name:'백금',     color:'#e5e7eb', hp: 900, value: 32,  tier:4 },
+      { key:'Sapphire', name:'사파이어', color:'#60a5fa', hp:1200, value: 48,  tier:4 },
+      { key:'Ruby',     name:'루비',     color:'#f43f5e', hp:1400, value: 60,  tier:5 },
+      { key:'Emerald',  name:'에메랄드', color:'#34d399', hp:1650, value: 80,  tier:5 },
+      { key:'Mythril',  name:'미스릴',   color:'#93c5fd', hp:2200, value:120, tier:6 },
+      { key:'Diamond',  name:'다이아몬드', color:'#b9f6ff', hp:3000, value:180, tier:6 }
+    ];
+    window.ORE_DATA = ORES;
+    const ORE_BY_KEY = new Map(ORES.map(ore=>[ore.key, ore]));
+    const SPAWN_COLUMN_MAP = {
+      '석재':'Stone',
+      '구리':'Copper',
+      '철':'Iron',
+      '은':'Silver',
+      '금':'Gold',
+      '백금':'Platinum',
+      '사파이어':'Sapphire',
+      '루비':'Ruby',
+      '에메랄드':'Emerald',
+      '미스릴':'Mythril',
+      '다이아몬드':'Diamond'
+    };
+    function parseSpawnTable(raw){
+      const table = new Map();
+      if(typeof raw !== 'string') return { table, floors: [], maxFloor: 0 };
+      const lines = raw.split(/\r?\n/).map(line=>line.trim()).filter(line=>line.length>0);
+      if(lines.length<=1) return { table, floors: [], maxFloor: 0 };
+      const headers = lines[0].split(/\s+/);
+      const columns = headers.slice(1).map(label=> SPAWN_COLUMN_MAP[label] || null);
+      for(let i=1;i<lines.length;i++){
+        const parts = lines[i].split(/\s+/).filter(Boolean);
+        if(!parts.length) continue;
+        const floor = parseInt(parts[0], 10);
+        if(!Number.isFinite(floor)) continue;
+        const row = [];
+        for(let j=1;j<=columns.length;j++){
+          const key = columns[j-1];
+          if(!key) continue;
+          const token = parts[j] ?? '0';
+          const value = parseFloat(token.replace(/,/g,''));
+          if(!Number.isFinite(value) || value<=0) continue;
+          row.push({ key, chance: value });
+        }
+        if(row.length) table.set(floor, row);
+      }
+      const floors = Array.from(table.keys()).sort((a,b)=>a-b);
+      const maxFloor = floors.length? floors[floors.length-1] : 0;
+      return { table, floors, maxFloor };
+    }
+    const SPAWN_TABLE_INFO = parseSpawnTable(document.getElementById('spawnore-data')?.textContent || '');
+    const SPAWN_TABLE = SPAWN_TABLE_INFO.table;
+    const SPAWN_FLOORS = SPAWN_TABLE_INFO.floors;
+    const SPAWN_MAX_FLOOR = SPAWN_TABLE_INFO.maxFloor;
     const ACTIVE_SKILLS = window.ACTIVE_SKILL_DATA;
     const PASSIVE_SKILLS = window.PASSIVE_SKILL_DATA;
     const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
@@ -620,113 +678,41 @@ section[id^="tab-"].active{ display:block; }
     window.requestPlayGamesStatus = refreshPlayGamesStatus;
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
-      function eligibleOresForFloor(f){
-        const luck = state.aether?.luck||0;
-        const available = [];
-        for(const ore of ORES){
-          if(f < ore.minFloor) continue;
-          const bonus = Math.max(0, f - ore.minFloor);
-          const tierBoost = 1 + (ore.tier-1)*0.03*bonus;
-          const rareMul = 1 + luck*0.08*(ore.tier-1);
-          const baseWeight = Math.max(1, ore.weight * tierBoost * rareMul);
-          available.push({ ...ore, baseWeight });
-        }
-        if(!available.length) return [];
-
-        const commonKeys = ['Stone','Copper','Iron'];
-        const common = available.filter(o=> commonKeys.includes(o.key));
-        const rares = available.filter(o=> !commonKeys.includes(o.key));
-
-        if(!rares.length){
-          return common.map(o=>{
-            const { baseWeight, ...rest } = o;
-            return { ...rest, weight: Math.max(1, Math.round(baseWeight)) };
-          });
-        }
-
-        const totalBase = available.reduce((sum,o)=>sum+o.baseWeight,0);
-        const prob = new Map();
-        available.forEach(o=>{ prob.set(o.key, o.baseWeight/totalBase); });
-
-        const commonKeysList = common.map(o=>o.key);
-        const unlockedKeys = rares.map(o=>o.key);
-        const justUnlocked = rares.filter(o=> f === o.minFloor).map(o=>o.key);
-        const oldUnlocked = rares.filter(o=> f > o.minFloor).map(o=>o.key);
-
-        const sumProb = keys => keys.reduce((acc,k)=>acc+(prob.get(k)||0),0);
-        const takeFrom = (keys, amount)=>{
-          if(!keys.length || amount<=0) return 0;
-          const total = sumProb(keys);
-          if(total<=0) return 0;
-          const actual = Math.min(amount, total);
-          for(const k of keys){
-            const current = prob.get(k)||0;
-            const share = total ? current/total : 1/keys.length;
-            const next = current - actual*share;
-            prob.set(k, next>0? next:0);
-          }
-          return actual;
-        };
-        const addTo = (keys, amount)=>{
-          if(!keys.length || amount<=0) return;
-          const total = sumProb(keys);
-          if(total>0){
-            for(const k of keys){
-              const current = prob.get(k)||0;
-              const share = current/total;
-              prob.set(k, current + amount*share);
-            }
-          } else {
-            const share = amount/keys.length;
-            for(const k of keys){ prob.set(k, (prob.get(k)||0) + share); }
-          }
-        };
-
-        for(const key of justUnlocked){
-          const current = prob.get(key)||0;
-          const target = 0.01;
-          if(Math.abs(current-target) < 1e-6){ prob.set(key, target); continue; }
-          if(current < target){
-            let needed = target - current;
-            let obtained = takeFrom(commonKeysList, needed);
-            if(obtained < needed){
-              const others = unlockedKeys.filter(k=>k!==key);
-              obtained += takeFrom(others, needed-obtained);
-            }
-            const finalProb = current + obtained;
-            prob.set(key, finalProb > target ? target : finalProb);
-          } else {
-            const give = current - target;
-            prob.set(key, target);
-            addTo(commonKeysList, give);
-          }
-        }
-
-        if(oldUnlocked.length && commonKeysList.length){
-          const moved = takeFrom(commonKeysList, 0.01);
-          if(moved>0){
-            const share = moved/unlockedKeys.length;
-            for(const key of unlockedKeys){
-              prob.set(key, (prob.get(key)||0) + share);
-            }
-          }
-        }
-
-        const pool = [...common, ...rares];
-        const totals = pool.map(o=> Math.max(0, prob.get(o.key)||0));
-        const totalProb = totals.reduce((acc,v)=>acc+v,0);
-        if(totalProb<=0){
-          return pool.map(o=>{
-            const { baseWeight, ...rest } = o;
-            return { ...rest, weight: Math.max(1, Math.round(baseWeight)) };
-          });
-        }
-        return pool.map((o,idx)=>{
-          const { baseWeight, ...rest } = o;
-          const normalized = totals[idx]/totalProb;
-          return { ...rest, weight: Math.max(1, Math.round(normalized*1000)) };
-        });
+    function defaultOrePool(){ return ORES.map(o=>({ ...o, weight: 1 })); }
+    function spawnRowForFloor(f){
+      if(!SPAWN_FLOORS.length) return null;
+      const floor = Math.max(1, Math.floor(f));
+      if(SPAWN_TABLE.has(floor)) return SPAWN_TABLE.get(floor);
+      if(floor > SPAWN_MAX_FLOOR) return SPAWN_TABLE.get(SPAWN_MAX_FLOOR) || null;
+      for(let i=SPAWN_FLOORS.length-1;i>=0;i--){
+        const candidate = SPAWN_FLOORS[i];
+        if(candidate <= floor) return SPAWN_TABLE.get(candidate);
       }
+      return SPAWN_TABLE.get(SPAWN_FLOORS[0]) || null;
+    }
+    function eligibleOresForFloor(f){
+      const row = spawnRowForFloor(f);
+      if(!row || !row.length) return defaultOrePool();
+      const pool = [];
+      const luckLevel = state.aether?.luck || 0;
+      const hasLuck = luckLevel > 0;
+      for(const entry of row){
+        const info = ORE_BY_KEY.get(entry.key);
+        if(!info) continue;
+        const weight = Math.max(0, entry.chance);
+        if(!(weight>0)) continue;
+        let scaled = Math.max(1, Math.round(weight*100));
+        if(hasLuck){
+          const tierBonus = Math.max(0, (info.tier||1) - 1);
+          if(tierBonus>0){
+            const mul = 1 + luckLevel * 0.08 * tierBonus;
+            scaled = Math.max(1, Math.round(scaled * mul));
+          }
+        }
+        pool.push({ ...info, weight: scaled });
+      }
+      return pool.length ? pool : defaultOrePool();
+    }
     function gridRect(){
       const r = gridEl.getBoundingClientRect();
       if(r.width && r.height){
