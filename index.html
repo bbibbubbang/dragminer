@@ -221,7 +221,6 @@ section[id^="tab-"].active{ display:block; }
 
     
   </div>
-  <script src="data/spawnore" type="text/plain" id="spawnore-data"></script>
   <script src="data/upgrades.js"></script>
   <script src="data/skills.js"></script>
   <script src="data/aether.js"></script>
@@ -283,10 +282,27 @@ section[id^="tab-"].active{ display:block; }
       const maxFloor = floors.length? floors[floors.length-1] : 0;
       return { table, floors, maxFloor };
     }
-    const SPAWN_TABLE_INFO = parseSpawnTable(document.getElementById('spawnore-data')?.textContent || '');
-    const SPAWN_TABLE = SPAWN_TABLE_INFO.table;
-    const SPAWN_FLOORS = SPAWN_TABLE_INFO.floors;
-    const SPAWN_MAX_FLOOR = SPAWN_TABLE_INFO.maxFloor;
+    let SPAWN_TABLE = new Map();
+    let SPAWN_FLOORS = [];
+    let SPAWN_MAX_FLOOR = 0;
+
+    async function loadSpawnTable(){
+      try{
+        const resp = await fetch('data/spawnore');
+        if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const text = await resp.text();
+        const info = parseSpawnTable(text || '');
+        SPAWN_TABLE = info.table || new Map();
+        SPAWN_FLOORS = info.floors || [];
+        SPAWN_MAX_FLOOR = info.maxFloor || 0;
+      }catch(err){
+        console.warn('Failed to load spawn table, using defaults', err);
+        const fallback = parseSpawnTable('');
+        SPAWN_TABLE = fallback.table;
+        SPAWN_FLOORS = fallback.floors;
+        SPAWN_MAX_FLOOR = fallback.maxFloor;
+      }
+    }
     const ACTIVE_SKILLS = window.ACTIVE_SKILL_DATA;
     const PASSIVE_SKILLS = window.PASSIVE_SKILL_DATA;
     const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
@@ -1228,7 +1244,12 @@ section[id^="tab-"].active{ display:block; }
       renderTop();
       renderSkillBar();
     }
-    boot();
+
+    async function init(){
+      await loadSpawnTable();
+      boot();
+    }
+    init();
 
     window.addEventListener('resize', ()=>{
       gridRectCache = null;
