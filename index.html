@@ -222,8 +222,18 @@ section[id^="tab-"].active{ display:block; }
     
   </div>
 
+  <script src="data/probabilities.js"></script>
+  <script src="data/upgrades.js"></script>
+  <script src="data/skills.js"></script>
+  <script src="data/aether.js"></script>
   <script>
   (()=>{
+    const ORES = window.ORE_DATA;
+    const ACTIVE_SKILLS = window.ACTIVE_SKILL_DATA;
+    const PASSIVE_SKILLS = window.PASSIVE_SKILL_DATA;
+    const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
+    const UPGRADE_INFO = window.UPGRADE_INFO;
+    const UPGRADE_DEFAULTS = window.UPGRADE_DEFAULTS;
     const VERSION = 'miner_v2.6.1';
     // 고정 세이브키 + 구버전 마이그레이션
     const SAVE_KEY = 'miner_save_v1';
@@ -336,13 +346,14 @@ section[id^="tab-"].active{ display:block; }
     // ---------- Game State ----------
     const state = {
       player: { atkBase: 10, atk: 10, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
-      upgrades: {
-        atk:   { level: 1, baseCost: 30,  scale: 1.35 },
-        crit:  { level: 0, baseCost: 50,  scale: 1.7  },
-        spawn: { level: 0, baseCost: 80,  scale: 1.8  },
-        pet:   { level: 0, baseCost: 150, scale: 2.0  },
-        oreMul: {}
-      },
+      upgrades: (()=>{
+        const defaults = {};
+        for(const [key, def] of Object.entries(UPGRADE_DEFAULTS||{})){
+          if(def && typeof def === 'object' && !Array.isArray(def)) defaults[key] = { ...def };
+        }
+        defaults.oreMul = {};
+        return defaults;
+      })(),
       aether: { luck:0, petPlus:0, etherHaste:0, rebirths:0, autoAdvanceOwned:false, autoAdvanceEnabled:false },
 
       floor: 1,
@@ -415,43 +426,15 @@ section[id^="tab-"].active{ display:block; }
     }
 
     // ---------- Skills ----------
-    const ACTIVE_SKILLS = [
-      { key:'berserk',  name:'광폭화',   desc:'5초간 공격력 x2',         ae:150, cd:20 },
-      { key:'timewarp', name:'타임워프', desc:'시간 +3초(최대 20초)',    ae:120, cd:25 },
-      { key:'meteor',   name:'운석 낙하', desc:'모든 광석에 큰 피해',    ae:200, cd:30 },
-      { key:'haste',    name:'가속',     desc:'5초간 생성 속도 2배',     ae:140, cd:25 },
-      { key:'sonic',    name:'초음파',   desc:'가까운 광석에 즉시 큰 피해', ae:130, cd:18 },
-    ];
-    const PASSIVE_SKILLS = [
-      { key:'power',   name:'강화 채굴',  desc:'공격력 +1(기초)',            ae:120, once:true,  apply(){ state.player.atkBase = (state.player.atkBase||10) + 1; } },
-      { key:'sharp',   name:'예리함',    desc:'치명타 확률 +3% (최대 50%)',   ae:150, once:true,  apply(){ state.player.critChance = Math.min(0.5, state.player.critChance + 0.03); } },
-      { key:'merchant',name:'상인 감각',  desc:'판매가 +10%',                 ae:180, once:false, apply(){ state.passive.sellBonus += 0.10; } },
-      { key:'petmaster',name:'펫 조련',  desc:'펫 +1',                      ae:200, once:false, apply(){ state.passive.petPlus += 1; if(state.inRun) spawnPets(); } },
-    ];
+    // 데이터는 data/skills.js에서 로드됩니다.
 
     // ---------- Rebirth-only Aether ----------
-    const REBIRTH_PERKS = [
-      { key:'luck',        name:'행운 촉매',   desc:'희귀 광물 가중치 상승', base:25, scale:1.6, max:20, get lvl(){ return state.aether.luck||0; },      apply(){ state.aether.luck=(state.aether.luck||0)+1; } },
-      { key:'petPlus',     name:'차원 펫',     desc:'특별 펫 +1',            base:40, scale:1.8, max:5,  get lvl(){ return state.aether.petPlus||0; },   apply(){ state.aether.petPlus=(state.aether.petPlus||0)+1; } },
-      { key:'etherHaste',  name:'에테르 공명', desc:'에테르 등장 -1초(최소 5초)', base:30, scale:1.6, max:10, get lvl(){ return state.aether.etherHaste||0; }, apply(){ state.aether.etherHaste=(state.aether.etherHaste||0)+1; } },
-    ];
-    function perkCost(p){ return Math.floor(p.base * Math.pow(p.scale, p.lvl)); }
+    // 데이터는 data/aether.js에서 로드됩니다.
+    function perkCost(p){ return Math.floor(p.base * Math.pow(p.scale, p.getLevel(state))); }
     const rebirthPick = {}; // {key:1}
 
     // ---------- Ores ----------
-    const ORES = [
-      { key:'Stone',   name:'석재',     color:'#a3a3a3', hp:  60,  value: 1,  weight: 40, tier:1, minFloor:1 },
-      { key:'Copper',  name:'구리',     color:'#ef9a9a', hp: 120,  value: 2,  weight: 36, tier:1, minFloor:1 },
-      { key:'Iron',    name:'철',       color:'#90caf9', hp: 220,  value: 4,  weight: 30, tier:2, minFloor:2 },
-      { key:'Silver',  name:'은',       color:'#cfd8dc', hp: 380,  value: 9,  weight: 22, tier:3, minFloor:4 },
-      { key:'Gold',    name:'금',       color:'#f6e05e', hp: 650,  value: 20, weight: 16, tier:3, minFloor:9 },
-      { key:'Platinum',name:'백금',     color:'#e5e7eb', hp: 900,  value: 32, weight: 10, tier:4, minFloor:14 },
-      { key:'Sapphire',name:'사파이어', color:'#60a5fa', hp:1200,  value: 48, weight: 7,  tier:4, minFloor:19 },
-      { key:'Ruby',    name:'루비',     color:'#f43f5e', hp:1400,  value: 60, weight: 6,  tier:5, minFloor:24 },
-      { key:'Emerald', name:'에메랄드', color:'#34d399', hp:1650,  value: 80, weight: 5,  tier:5, minFloor:29 },
-      { key:'Mythril', name:'미스릴',   color:'#93c5fd', hp:2200,  value:120, weight: 3,  tier:6, minFloor:34 },
-      { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:3000,  value:180, weight: 2,  tier:6, minFloor:39 },
-    ];
+    // 데이터는 data/probabilities.js에서 로드됩니다.
 
     for(const o of ORES){ state.inventory[o.key]=state.inventory[o.key]||0; state.loot[o.key]=0; state.upgrades.oreMul[o.key]=state.upgrades.oreMul[o.key]||0; }
 
@@ -818,14 +801,26 @@ section[id^="tab-"].active{ display:block; }
     function renderUpgrades(){
       const cont=$('#upgrades'); cont.innerHTML='';
       calcAtk();
-      const atkCost=Math.floor(state.upgrades.atk.baseCost*Math.pow(state.upgrades.atk.scale,state.upgrades.atk.level-1));
-      cont.appendChild(upgradeCard('🗡️ 공격력', `현재: ${state.player.atk} (레벨 ${state.upgrades.atk.level})`, atkCost, ()=>{ if(spend(atkCost)){ state.upgrades.atk.level++; SFX.ui(); save(); refresh(); } else SFX.deny(); }));
-      const critCost=Math.floor(state.upgrades.crit.baseCost*Math.pow(state.upgrades.crit.scale,state.upgrades.crit.level));
-      cont.appendChild(upgradeCard('🎯 치명타 확률', `현재: ${(state.player.critChance*100).toFixed(1)}%`, critCost, ()=>{ if(state.player.critChance>=0.5) return toast('최대 50%'), SFX.deny(); if(spend(critCost)){ state.upgrades.crit.level++; state.player.critChance+=0.02; SFX.ui(); save(); refresh(); } else SFX.deny(); }));
-      const spawnCost=Math.floor(state.upgrades.spawn.baseCost*Math.pow(state.upgrades.spawn.scale,state.upgrades.spawn.level));
-      cont.appendChild(upgradeCard('⚙️ 생성 속도', `레벨: ${state.upgrades.spawn.level}`, spawnCost, ()=>{ if(spend(spawnCost)){ state.upgrades.spawn.level++; if(state.inRun) restartSpawnTimer(); SFX.ui(); save(); refresh(); } else SFX.deny(); }));
-      const petCost=Math.floor(state.upgrades.pet.baseCost*Math.pow(state.upgrades.pet.scale,state.upgrades.pet.level));
-      cont.appendChild(upgradeCard('🤖 자동채굴 펫', `보유: ${(state.upgrades.pet.level + (state.passive.petPlus||0) + (state.aether?.petPlus||0))}마리`, petCost, ()=>{ if(spend(petCost)){ state.upgrades.pet.level++; if(state.inRun) spawnPets(); SFX.ui(); save(); refresh(); } else SFX.deny(); }));
+      for(const info of UPGRADE_INFO || []){
+        const desc = typeof info.getDescription === 'function' ? info.getDescription(state) : '';
+        const cost = typeof info.getCost === 'function' ? info.getCost(state) : 0;
+        cont.appendChild(upgradeCard(info.title, desc, cost, ()=>{
+          const check = typeof info.canBuy === 'function' ? info.canBuy(state) : true;
+          if(check !== true){
+            if(typeof check === 'string' && check){ toast(check); }
+            SFX.deny();
+            return;
+          }
+          const price = typeof info.getCost === 'function' ? info.getCost(state) : cost;
+          if(!spend(price)){ SFX.deny(); return; }
+          if(typeof info.onBuy === 'function'){
+            info.onBuy({ state, restartSpawnTimer, spawnPets });
+          }
+          SFX.ui();
+          save();
+          refresh();
+        }));
+      }
     }
     function upgradeCard(title, desc, cost, onBuy){ const wrap=document.createElement('div'); wrap.className='inv-item'; wrap.innerHTML = `<h4 style="margin:0 0 4px 0">${title}</h4><div class="mono">${desc}</div><div class="row" style="margin-top:8px;justify-content:space-between"><div class="row"><span>가격:</span> <b class="price">${cost}</b></div><button class="btn">구매</button></div>`; wrap.querySelector('.btn').addEventListener('click', onBuy); return wrap; }
     function spend(amount){ if(state.player.gold < amount){ toast('골드 부족'); return false; } state.player.gold -= amount; return true; }
@@ -844,13 +839,14 @@ section[id^="tab-"].active{ display:block; }
       const list = $('#rebirthPerks'); list.innerHTML='';
       let total = 0;
       for(const p of REBIRTH_PERKS){
-        const maxed = p.lvl >= p.max;
+        const lvl = p.getLevel(state);
+        const maxed = lvl >= p.max;
         const cost = perkCost(p);
         const checked = !!rebirthPick[p.key];
         const row = document.createElement('div'); row.className='skill-card';
         row.innerHTML = `<div class="row" style="justify-content:space-between"><b>${p.name}</b><span class="mono">${p.desc}</span></div>
                          <div class="row" style="justify-content:space-between;margin-top:6px">
-                           <div class="mono">레벨 ${p.lvl}/${p.max} · 비용 ${cost} 에테르</div>
+                           <div class="mono">레벨 ${lvl}/${p.max} · 비용 ${cost} 에테르</div>
                            <label class="row" style="gap:6px;align-items:center">
                              <input type="checkbox" ${checked?'checked':''} ${maxed?'disabled':''} data-perk="${p.key}">
                              <span>${maxed?'최대':''}선택</span>
@@ -906,7 +902,7 @@ section[id^="tab-"].active{ display:block; }
           if(sk.once && owned){ toast('이미 보유'); SFX.deny(); return; }
           if(!state.skillsOwnedPassive[sk.key]) state.skillsOwnedPassive[sk.key]=0;
           state.skillsOwnedPassive[sk.key] += 1;
-          sk.apply();
+          if(typeof sk.apply === 'function'){ sk.apply({ state, spawnPets }); }
           toast(`${sk.name} 적용!`); SFX.ui(); save(); renderSkills(); renderUpgrades(); renderTop();
         });
         shopP.appendChild(card);
@@ -1209,7 +1205,8 @@ section[id^="tab-"].active{ display:block; }
       for(const p of REBIRTH_PERKS){
         if(rebirthPick[p.key]){
           const cost = perkCost(p);
-          if(p.lvl >= p.max) continue;
+          const lvl = p.getLevel(state);
+          if(lvl >= p.max) continue;
           total += cost; chosen.push(p);
         }
       }
@@ -1217,7 +1214,7 @@ section[id^="tab-"].active{ display:block; }
       if(state.player.ether < total) return toast('에테르 부족');
       if(!confirm('선택한 보너스를 구매하고 환생하시겠습니까?')) return;
       state.player.ether -= total;
-      for(const p of chosen){ p.apply(); }
+      for(const p of chosen){ if(typeof p.apply === 'function') p.apply({ state }); }
       if(state.inRun) bankAndExit(false);
       state.floor = 1; state.aether.rebirths = (state.aether.rebirths||0)+1;
       for(const k in rebirthPick){ delete rebirthPick[k]; }
