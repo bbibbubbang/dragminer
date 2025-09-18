@@ -443,14 +443,14 @@ section[id^="tab-"].active{ display:block; }
       { key:'Stone',   name:'석재',     color:'#a3a3a3', hp:  60,  value: 1,  weight: 40, tier:1, minFloor:1 },
       { key:'Copper',  name:'구리',     color:'#ef9a9a', hp: 120,  value: 2,  weight: 36, tier:1, minFloor:1 },
       { key:'Iron',    name:'철',       color:'#90caf9', hp: 220,  value: 4,  weight: 30, tier:2, minFloor:2 },
-        { key:'Silver',  name:'은',       color:'#cfd8dc', hp: 380,  value: 9,  weight: 22, tier:3, minFloor:1 },
-      { key:'Gold',    name:'금',       color:'#f6e05e', hp: 650,  value: 20, weight: 16, tier:3, minFloor:5 },
-      { key:'Platinum',name:'백금',     color:'#e5e7eb', hp: 900,  value: 32, weight: 10, tier:4, minFloor:8 },
-      { key:'Sapphire',name:'사파이어', color:'#60a5fa', hp:1200,  value: 48, weight: 7,  tier:4, minFloor:10 },
-      { key:'Ruby',    name:'루비',     color:'#f43f5e', hp:1400,  value: 60, weight: 6,  tier:5, minFloor:12 },
-      { key:'Emerald', name:'에메랄드', color:'#34d399', hp:1650,  value: 80, weight: 5,  tier:5, minFloor:15 },
-      { key:'Mythril', name:'미스릴',   color:'#93c5fd', hp:2200,  value:120, weight: 3,  tier:6, minFloor:18 },
-      { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:3000,  value:180, weight: 2,  tier:6, minFloor:22 },
+      { key:'Silver',  name:'은',       color:'#cfd8dc', hp: 380,  value: 9,  weight: 22, tier:3, minFloor:4 },
+      { key:'Gold',    name:'금',       color:'#f6e05e', hp: 650,  value: 20, weight: 16, tier:3, minFloor:9 },
+      { key:'Platinum',name:'백금',     color:'#e5e7eb', hp: 900,  value: 32, weight: 10, tier:4, minFloor:14 },
+      { key:'Sapphire',name:'사파이어', color:'#60a5fa', hp:1200,  value: 48, weight: 7,  tier:4, minFloor:19 },
+      { key:'Ruby',    name:'루비',     color:'#f43f5e', hp:1400,  value: 60, weight: 6,  tier:5, minFloor:24 },
+      { key:'Emerald', name:'에메랄드', color:'#34d399', hp:1650,  value: 80, weight: 5,  tier:5, minFloor:29 },
+      { key:'Mythril', name:'미스릴',   color:'#93c5fd', hp:2200,  value:120, weight: 3,  tier:6, minFloor:34 },
+      { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:3000,  value:180, weight: 2,  tier:6, minFloor:39 },
     ];
 
     for(const o of ORES){ state.inventory[o.key]=state.inventory[o.key]||0; state.loot[o.key]=0; state.upgrades.oreMul[o.key]=state.upgrades.oreMul[o.key]||0; }
@@ -639,13 +639,109 @@ section[id^="tab-"].active{ display:block; }
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
       function eligibleOresForFloor(f){
         const luck = state.aether?.luck||0;
-        return ORES.filter(o=> f >= o.minFloor).map(o=>{
-          const bonus = Math.max(0, f - o.minFloor);
-          const tierBoost = 1 + (o.tier-1)*0.03*bonus;
-          const rareMul = 1 + luck*0.08*(o.tier-1);
-          let weight = o.weight * tierBoost * rareMul;
-          if(o.key==='Silver' && f<3){ weight *= (f===1 ? 0.1 : 0.3); }
-          return { ...o, weight: Math.max(1, Math.round(weight)) };
+        const available = [];
+        for(const ore of ORES){
+          if(f < ore.minFloor) continue;
+          const bonus = Math.max(0, f - ore.minFloor);
+          const tierBoost = 1 + (ore.tier-1)*0.03*bonus;
+          const rareMul = 1 + luck*0.08*(ore.tier-1);
+          const baseWeight = Math.max(1, ore.weight * tierBoost * rareMul);
+          available.push({ ...ore, baseWeight });
+        }
+        if(!available.length) return [];
+
+        const commonKeys = ['Stone','Copper','Iron'];
+        const common = available.filter(o=> commonKeys.includes(o.key));
+        const rares = available.filter(o=> !commonKeys.includes(o.key));
+
+        if(!rares.length){
+          return common.map(o=>{
+            const { baseWeight, ...rest } = o;
+            return { ...rest, weight: Math.max(1, Math.round(baseWeight)) };
+          });
+        }
+
+        const totalBase = available.reduce((sum,o)=>sum+o.baseWeight,0);
+        const prob = new Map();
+        available.forEach(o=>{ prob.set(o.key, o.baseWeight/totalBase); });
+
+        const commonKeysList = common.map(o=>o.key);
+        const unlockedKeys = rares.map(o=>o.key);
+        const justUnlocked = rares.filter(o=> f === o.minFloor).map(o=>o.key);
+        const oldUnlocked = rares.filter(o=> f > o.minFloor).map(o=>o.key);
+
+        const sumProb = keys => keys.reduce((acc,k)=>acc+(prob.get(k)||0),0);
+        const takeFrom = (keys, amount)=>{
+          if(!keys.length || amount<=0) return 0;
+          const total = sumProb(keys);
+          if(total<=0) return 0;
+          const actual = Math.min(amount, total);
+          for(const k of keys){
+            const current = prob.get(k)||0;
+            const share = total ? current/total : 1/keys.length;
+            const next = current - actual*share;
+            prob.set(k, next>0? next:0);
+          }
+          return actual;
+        };
+        const addTo = (keys, amount)=>{
+          if(!keys.length || amount<=0) return;
+          const total = sumProb(keys);
+          if(total>0){
+            for(const k of keys){
+              const current = prob.get(k)||0;
+              const share = current/total;
+              prob.set(k, current + amount*share);
+            }
+          } else {
+            const share = amount/keys.length;
+            for(const k of keys){ prob.set(k, (prob.get(k)||0) + share); }
+          }
+        };
+
+        for(const key of justUnlocked){
+          const current = prob.get(key)||0;
+          const target = 0.01;
+          if(Math.abs(current-target) < 1e-6){ prob.set(key, target); continue; }
+          if(current < target){
+            let needed = target - current;
+            let obtained = takeFrom(commonKeysList, needed);
+            if(obtained < needed){
+              const others = unlockedKeys.filter(k=>k!==key);
+              obtained += takeFrom(others, needed-obtained);
+            }
+            const finalProb = current + obtained;
+            prob.set(key, finalProb > target ? target : finalProb);
+          } else {
+            const give = current - target;
+            prob.set(key, target);
+            addTo(commonKeysList, give);
+          }
+        }
+
+        if(oldUnlocked.length && commonKeysList.length){
+          const moved = takeFrom(commonKeysList, 0.01);
+          if(moved>0){
+            const share = moved/unlockedKeys.length;
+            for(const key of unlockedKeys){
+              prob.set(key, (prob.get(key)||0) + share);
+            }
+          }
+        }
+
+        const pool = [...common, ...rares];
+        const totals = pool.map(o=> Math.max(0, prob.get(o.key)||0));
+        const totalProb = totals.reduce((acc,v)=>acc+v,0);
+        if(totalProb<=0){
+          return pool.map(o=>{
+            const { baseWeight, ...rest } = o;
+            return { ...rest, weight: Math.max(1, Math.round(baseWeight)) };
+          });
+        }
+        return pool.map((o,idx)=>{
+          const { baseWeight, ...rest } = o;
+          const normalized = totals[idx]/totalProb;
+          return { ...rest, weight: Math.max(1, Math.round(normalized*1000)) };
         });
       }
     function gridRect(){
