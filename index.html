@@ -729,6 +729,22 @@ section[id^="tab-"].active{ display:block; }
           }
         }
 
+        let minTier = Infinity;
+        let maxTier = -Infinity;
+        for(const ore of available){
+          if(ore.tier < minTier) minTier = ore.tier;
+          if(ore.tier > maxTier) maxTier = ore.tier;
+        }
+        if(minTier < maxTier){
+          const lowestTierKeys = available.filter(o=>o.tier===minTier).map(o=>o.key);
+          const highestTierKeys = available.filter(o=>o.tier===maxTier).map(o=>o.key);
+          const shiftAmount = Math.max(0, (f-1) * 0.01);
+          if(shiftAmount>0 && lowestTierKeys.length && highestTierKeys.length){
+            const moved = takeFrom(lowestTierKeys, shiftAmount);
+            if(moved>0){ addTo(highestTierKeys, moved); }
+          }
+        }
+
         const pool = [...common, ...rares];
         const totals = pool.map(o=> Math.max(0, prob.get(o.key)||0));
         const totalProb = totals.reduce((acc,v)=>acc+v,0);
