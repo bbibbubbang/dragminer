@@ -1,0 +1,1969 @@
+{
+  "version": "1",
+  "floors": {
+    "1": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Silver",
+        "weight": 2
+      }
+    ],
+    "2": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 30
+      },
+      {
+        "key": "Silver",
+        "weight": 7
+      }
+    ],
+    "3": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 31
+      },
+      {
+        "key": "Silver",
+        "weight": 25
+      }
+    ],
+    "4": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 32
+      },
+      {
+        "key": "Silver",
+        "weight": 26
+      }
+    ],
+    "5": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 33
+      },
+      {
+        "key": "Silver",
+        "weight": 27
+      },
+      {
+        "key": "Gold",
+        "weight": 16
+      }
+    ],
+    "6": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 34
+      },
+      {
+        "key": "Silver",
+        "weight": 29
+      },
+      {
+        "key": "Gold",
+        "weight": 17
+      }
+    ],
+    "7": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 35
+      },
+      {
+        "key": "Silver",
+        "weight": 30
+      },
+      {
+        "key": "Gold",
+        "weight": 18
+      }
+    ],
+    "8": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 35
+      },
+      {
+        "key": "Silver",
+        "weight": 31
+      },
+      {
+        "key": "Gold",
+        "weight": 19
+      },
+      {
+        "key": "Platinum",
+        "weight": 10
+      }
+    ],
+    "9": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 36
+      },
+      {
+        "key": "Silver",
+        "weight": 33
+      },
+      {
+        "key": "Gold",
+        "weight": 20
+      },
+      {
+        "key": "Platinum",
+        "weight": 11
+      }
+    ],
+    "10": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 37
+      },
+      {
+        "key": "Silver",
+        "weight": 34
+      },
+      {
+        "key": "Gold",
+        "weight": 21
+      },
+      {
+        "key": "Platinum",
+        "weight": 12
+      },
+      {
+        "key": "Sapphire",
+        "weight": 7
+      }
+    ],
+    "11": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 38
+      },
+      {
+        "key": "Silver",
+        "weight": 35
+      },
+      {
+        "key": "Gold",
+        "weight": 22
+      },
+      {
+        "key": "Platinum",
+        "weight": 13
+      },
+      {
+        "key": "Sapphire",
+        "weight": 8
+      }
+    ],
+    "12": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 39
+      },
+      {
+        "key": "Silver",
+        "weight": 37
+      },
+      {
+        "key": "Gold",
+        "weight": 23
+      },
+      {
+        "key": "Platinum",
+        "weight": 14
+      },
+      {
+        "key": "Sapphire",
+        "weight": 8
+      },
+      {
+        "key": "Ruby",
+        "weight": 6
+      }
+    ],
+    "13": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 40
+      },
+      {
+        "key": "Silver",
+        "weight": 38
+      },
+      {
+        "key": "Gold",
+        "weight": 24
+      },
+      {
+        "key": "Platinum",
+        "weight": 15
+      },
+      {
+        "key": "Sapphire",
+        "weight": 9
+      },
+      {
+        "key": "Ruby",
+        "weight": 7
+      }
+    ],
+    "14": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 41
+      },
+      {
+        "key": "Silver",
+        "weight": 39
+      },
+      {
+        "key": "Gold",
+        "weight": 25
+      },
+      {
+        "key": "Platinum",
+        "weight": 15
+      },
+      {
+        "key": "Sapphire",
+        "weight": 10
+      },
+      {
+        "key": "Ruby",
+        "weight": 7
+      }
+    ],
+    "15": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 42
+      },
+      {
+        "key": "Silver",
+        "weight": 40
+      },
+      {
+        "key": "Gold",
+        "weight": 26
+      },
+      {
+        "key": "Platinum",
+        "weight": 16
+      },
+      {
+        "key": "Sapphire",
+        "weight": 10
+      },
+      {
+        "key": "Ruby",
+        "weight": 8
+      },
+      {
+        "key": "Emerald",
+        "weight": 5
+      }
+    ],
+    "16": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 43
+      },
+      {
+        "key": "Silver",
+        "weight": 42
+      },
+      {
+        "key": "Gold",
+        "weight": 27
+      },
+      {
+        "key": "Platinum",
+        "weight": 17
+      },
+      {
+        "key": "Sapphire",
+        "weight": 11
+      },
+      {
+        "key": "Ruby",
+        "weight": 9
+      },
+      {
+        "key": "Emerald",
+        "weight": 6
+      }
+    ],
+    "17": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 44
+      },
+      {
+        "key": "Silver",
+        "weight": 43
+      },
+      {
+        "key": "Gold",
+        "weight": 28
+      },
+      {
+        "key": "Platinum",
+        "weight": 18
+      },
+      {
+        "key": "Sapphire",
+        "weight": 11
+      },
+      {
+        "key": "Ruby",
+        "weight": 10
+      },
+      {
+        "key": "Emerald",
+        "weight": 6
+      }
+    ],
+    "18": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 44
+      },
+      {
+        "key": "Silver",
+        "weight": 44
+      },
+      {
+        "key": "Gold",
+        "weight": 28
+      },
+      {
+        "key": "Platinum",
+        "weight": 19
+      },
+      {
+        "key": "Sapphire",
+        "weight": 12
+      },
+      {
+        "key": "Ruby",
+        "weight": 10
+      },
+      {
+        "key": "Emerald",
+        "weight": 7
+      },
+      {
+        "key": "Mythril",
+        "weight": 3
+      }
+    ],
+    "19": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 45
+      },
+      {
+        "key": "Silver",
+        "weight": 46
+      },
+      {
+        "key": "Gold",
+        "weight": 29
+      },
+      {
+        "key": "Platinum",
+        "weight": 20
+      },
+      {
+        "key": "Sapphire",
+        "weight": 13
+      },
+      {
+        "key": "Ruby",
+        "weight": 11
+      },
+      {
+        "key": "Emerald",
+        "weight": 7
+      },
+      {
+        "key": "Mythril",
+        "weight": 3
+      }
+    ],
+    "20": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 46
+      },
+      {
+        "key": "Silver",
+        "weight": 47
+      },
+      {
+        "key": "Gold",
+        "weight": 30
+      },
+      {
+        "key": "Platinum",
+        "weight": 21
+      },
+      {
+        "key": "Sapphire",
+        "weight": 13
+      },
+      {
+        "key": "Ruby",
+        "weight": 12
+      },
+      {
+        "key": "Emerald",
+        "weight": 8
+      },
+      {
+        "key": "Mythril",
+        "weight": 4
+      }
+    ],
+    "21": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 47
+      },
+      {
+        "key": "Silver",
+        "weight": 48
+      },
+      {
+        "key": "Gold",
+        "weight": 31
+      },
+      {
+        "key": "Platinum",
+        "weight": 22
+      },
+      {
+        "key": "Sapphire",
+        "weight": 14
+      },
+      {
+        "key": "Ruby",
+        "weight": 12
+      },
+      {
+        "key": "Emerald",
+        "weight": 9
+      },
+      {
+        "key": "Mythril",
+        "weight": 4
+      }
+    ],
+    "22": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 48
+      },
+      {
+        "key": "Silver",
+        "weight": 50
+      },
+      {
+        "key": "Gold",
+        "weight": 32
+      },
+      {
+        "key": "Platinum",
+        "weight": 23
+      },
+      {
+        "key": "Sapphire",
+        "weight": 15
+      },
+      {
+        "key": "Ruby",
+        "weight": 13
+      },
+      {
+        "key": "Emerald",
+        "weight": 9
+      },
+      {
+        "key": "Mythril",
+        "weight": 5
+      },
+      {
+        "key": "Diamond",
+        "weight": 2
+      }
+    ],
+    "23": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 49
+      },
+      {
+        "key": "Silver",
+        "weight": 51
+      },
+      {
+        "key": "Gold",
+        "weight": 33
+      },
+      {
+        "key": "Platinum",
+        "weight": 23
+      },
+      {
+        "key": "Sapphire",
+        "weight": 15
+      },
+      {
+        "key": "Ruby",
+        "weight": 14
+      },
+      {
+        "key": "Emerald",
+        "weight": 10
+      },
+      {
+        "key": "Mythril",
+        "weight": 5
+      },
+      {
+        "key": "Diamond",
+        "weight": 2
+      }
+    ],
+    "24": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 50
+      },
+      {
+        "key": "Silver",
+        "weight": 52
+      },
+      {
+        "key": "Gold",
+        "weight": 34
+      },
+      {
+        "key": "Platinum",
+        "weight": 24
+      },
+      {
+        "key": "Sapphire",
+        "weight": 16
+      },
+      {
+        "key": "Ruby",
+        "weight": 15
+      },
+      {
+        "key": "Emerald",
+        "weight": 10
+      },
+      {
+        "key": "Mythril",
+        "weight": 6
+      },
+      {
+        "key": "Diamond",
+        "weight": 3
+      }
+    ],
+    "25": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 51
+      },
+      {
+        "key": "Silver",
+        "weight": 54
+      },
+      {
+        "key": "Gold",
+        "weight": 35
+      },
+      {
+        "key": "Platinum",
+        "weight": 25
+      },
+      {
+        "key": "Sapphire",
+        "weight": 16
+      },
+      {
+        "key": "Ruby",
+        "weight": 15
+      },
+      {
+        "key": "Emerald",
+        "weight": 11
+      },
+      {
+        "key": "Mythril",
+        "weight": 6
+      },
+      {
+        "key": "Diamond",
+        "weight": 3
+      }
+    ],
+    "26": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 52
+      },
+      {
+        "key": "Silver",
+        "weight": 55
+      },
+      {
+        "key": "Gold",
+        "weight": 36
+      },
+      {
+        "key": "Platinum",
+        "weight": 26
+      },
+      {
+        "key": "Sapphire",
+        "weight": 17
+      },
+      {
+        "key": "Ruby",
+        "weight": 16
+      },
+      {
+        "key": "Emerald",
+        "weight": 12
+      },
+      {
+        "key": "Mythril",
+        "weight": 7
+      },
+      {
+        "key": "Diamond",
+        "weight": 3
+      }
+    ],
+    "27": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 53
+      },
+      {
+        "key": "Silver",
+        "weight": 56
+      },
+      {
+        "key": "Gold",
+        "weight": 37
+      },
+      {
+        "key": "Platinum",
+        "weight": 27
+      },
+      {
+        "key": "Sapphire",
+        "weight": 18
+      },
+      {
+        "key": "Ruby",
+        "weight": 17
+      },
+      {
+        "key": "Emerald",
+        "weight": 12
+      },
+      {
+        "key": "Mythril",
+        "weight": 7
+      },
+      {
+        "key": "Diamond",
+        "weight": 4
+      }
+    ],
+    "28": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 53
+      },
+      {
+        "key": "Silver",
+        "weight": 58
+      },
+      {
+        "key": "Gold",
+        "weight": 38
+      },
+      {
+        "key": "Platinum",
+        "weight": 28
+      },
+      {
+        "key": "Sapphire",
+        "weight": 18
+      },
+      {
+        "key": "Ruby",
+        "weight": 18
+      },
+      {
+        "key": "Emerald",
+        "weight": 13
+      },
+      {
+        "key": "Mythril",
+        "weight": 8
+      },
+      {
+        "key": "Diamond",
+        "weight": 4
+      }
+    ],
+    "29": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 54
+      },
+      {
+        "key": "Silver",
+        "weight": 59
+      },
+      {
+        "key": "Gold",
+        "weight": 39
+      },
+      {
+        "key": "Platinum",
+        "weight": 29
+      },
+      {
+        "key": "Sapphire",
+        "weight": 19
+      },
+      {
+        "key": "Ruby",
+        "weight": 18
+      },
+      {
+        "key": "Emerald",
+        "weight": 13
+      },
+      {
+        "key": "Mythril",
+        "weight": 8
+      },
+      {
+        "key": "Diamond",
+        "weight": 4
+      }
+    ],
+    "30": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 55
+      },
+      {
+        "key": "Silver",
+        "weight": 60
+      },
+      {
+        "key": "Gold",
+        "weight": 40
+      },
+      {
+        "key": "Platinum",
+        "weight": 30
+      },
+      {
+        "key": "Sapphire",
+        "weight": 20
+      },
+      {
+        "key": "Ruby",
+        "weight": 19
+      },
+      {
+        "key": "Emerald",
+        "weight": 14
+      },
+      {
+        "key": "Mythril",
+        "weight": 8
+      },
+      {
+        "key": "Diamond",
+        "weight": 4
+      }
+    ],
+    "31": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 56
+      },
+      {
+        "key": "Silver",
+        "weight": 62
+      },
+      {
+        "key": "Gold",
+        "weight": 41
+      },
+      {
+        "key": "Platinum",
+        "weight": 31
+      },
+      {
+        "key": "Sapphire",
+        "weight": 20
+      },
+      {
+        "key": "Ruby",
+        "weight": 20
+      },
+      {
+        "key": "Emerald",
+        "weight": 15
+      },
+      {
+        "key": "Mythril",
+        "weight": 9
+      },
+      {
+        "key": "Diamond",
+        "weight": 5
+      }
+    ],
+    "32": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 57
+      },
+      {
+        "key": "Silver",
+        "weight": 63
+      },
+      {
+        "key": "Gold",
+        "weight": 42
+      },
+      {
+        "key": "Platinum",
+        "weight": 32
+      },
+      {
+        "key": "Sapphire",
+        "weight": 21
+      },
+      {
+        "key": "Ruby",
+        "weight": 20
+      },
+      {
+        "key": "Emerald",
+        "weight": 15
+      },
+      {
+        "key": "Mythril",
+        "weight": 9
+      },
+      {
+        "key": "Diamond",
+        "weight": 5
+      }
+    ],
+    "33": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 58
+      },
+      {
+        "key": "Silver",
+        "weight": 64
+      },
+      {
+        "key": "Gold",
+        "weight": 43
+      },
+      {
+        "key": "Platinum",
+        "weight": 33
+      },
+      {
+        "key": "Sapphire",
+        "weight": 21
+      },
+      {
+        "key": "Ruby",
+        "weight": 21
+      },
+      {
+        "key": "Emerald",
+        "weight": 16
+      },
+      {
+        "key": "Mythril",
+        "weight": 10
+      },
+      {
+        "key": "Diamond",
+        "weight": 5
+      }
+    ],
+    "34": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 59
+      },
+      {
+        "key": "Silver",
+        "weight": 66
+      },
+      {
+        "key": "Gold",
+        "weight": 44
+      },
+      {
+        "key": "Platinum",
+        "weight": 33
+      },
+      {
+        "key": "Sapphire",
+        "weight": 22
+      },
+      {
+        "key": "Ruby",
+        "weight": 22
+      },
+      {
+        "key": "Emerald",
+        "weight": 16
+      },
+      {
+        "key": "Mythril",
+        "weight": 10
+      },
+      {
+        "key": "Diamond",
+        "weight": 6
+      }
+    ],
+    "35": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 60
+      },
+      {
+        "key": "Silver",
+        "weight": 67
+      },
+      {
+        "key": "Gold",
+        "weight": 45
+      },
+      {
+        "key": "Platinum",
+        "weight": 34
+      },
+      {
+        "key": "Sapphire",
+        "weight": 23
+      },
+      {
+        "key": "Ruby",
+        "weight": 23
+      },
+      {
+        "key": "Emerald",
+        "weight": 17
+      },
+      {
+        "key": "Mythril",
+        "weight": 11
+      },
+      {
+        "key": "Diamond",
+        "weight": 6
+      }
+    ],
+    "36": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 61
+      },
+      {
+        "key": "Silver",
+        "weight": 68
+      },
+      {
+        "key": "Gold",
+        "weight": 46
+      },
+      {
+        "key": "Platinum",
+        "weight": 35
+      },
+      {
+        "key": "Sapphire",
+        "weight": 23
+      },
+      {
+        "key": "Ruby",
+        "weight": 23
+      },
+      {
+        "key": "Emerald",
+        "weight": 18
+      },
+      {
+        "key": "Mythril",
+        "weight": 11
+      },
+      {
+        "key": "Diamond",
+        "weight": 6
+      }
+    ],
+    "37": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 61
+      },
+      {
+        "key": "Silver",
+        "weight": 70
+      },
+      {
+        "key": "Gold",
+        "weight": 47
+      },
+      {
+        "key": "Platinum",
+        "weight": 36
+      },
+      {
+        "key": "Sapphire",
+        "weight": 24
+      },
+      {
+        "key": "Ruby",
+        "weight": 24
+      },
+      {
+        "key": "Emerald",
+        "weight": 18
+      },
+      {
+        "key": "Mythril",
+        "weight": 12
+      },
+      {
+        "key": "Diamond",
+        "weight": 7
+      }
+    ],
+    "38": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 62
+      },
+      {
+        "key": "Silver",
+        "weight": 71
+      },
+      {
+        "key": "Gold",
+        "weight": 48
+      },
+      {
+        "key": "Platinum",
+        "weight": 37
+      },
+      {
+        "key": "Sapphire",
+        "weight": 25
+      },
+      {
+        "key": "Ruby",
+        "weight": 25
+      },
+      {
+        "key": "Emerald",
+        "weight": 19
+      },
+      {
+        "key": "Mythril",
+        "weight": 12
+      },
+      {
+        "key": "Diamond",
+        "weight": 7
+      }
+    ],
+    "39": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 63
+      },
+      {
+        "key": "Silver",
+        "weight": 72
+      },
+      {
+        "key": "Gold",
+        "weight": 49
+      },
+      {
+        "key": "Platinum",
+        "weight": 38
+      },
+      {
+        "key": "Sapphire",
+        "weight": 25
+      },
+      {
+        "key": "Ruby",
+        "weight": 25
+      },
+      {
+        "key": "Emerald",
+        "weight": 19
+      },
+      {
+        "key": "Mythril",
+        "weight": 12
+      },
+      {
+        "key": "Diamond",
+        "weight": 7
+      }
+    ],
+    "40": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 64
+      },
+      {
+        "key": "Silver",
+        "weight": 73
+      },
+      {
+        "key": "Gold",
+        "weight": 50
+      },
+      {
+        "key": "Platinum",
+        "weight": 39
+      },
+      {
+        "key": "Sapphire",
+        "weight": 26
+      },
+      {
+        "key": "Ruby",
+        "weight": 26
+      },
+      {
+        "key": "Emerald",
+        "weight": 20
+      },
+      {
+        "key": "Mythril",
+        "weight": 13
+      },
+      {
+        "key": "Diamond",
+        "weight": 7
+      }
+    ],
+    "41": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 65
+      },
+      {
+        "key": "Silver",
+        "weight": 75
+      },
+      {
+        "key": "Gold",
+        "weight": 51
+      },
+      {
+        "key": "Platinum",
+        "weight": 40
+      },
+      {
+        "key": "Sapphire",
+        "weight": 27
+      },
+      {
+        "key": "Ruby",
+        "weight": 27
+      },
+      {
+        "key": "Emerald",
+        "weight": 21
+      },
+      {
+        "key": "Mythril",
+        "weight": 13
+      },
+      {
+        "key": "Diamond",
+        "weight": 8
+      }
+    ],
+    "42": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 66
+      },
+      {
+        "key": "Silver",
+        "weight": 76
+      },
+      {
+        "key": "Gold",
+        "weight": 52
+      },
+      {
+        "key": "Platinum",
+        "weight": 41
+      },
+      {
+        "key": "Sapphire",
+        "weight": 27
+      },
+      {
+        "key": "Ruby",
+        "weight": 28
+      },
+      {
+        "key": "Emerald",
+        "weight": 21
+      },
+      {
+        "key": "Mythril",
+        "weight": 14
+      },
+      {
+        "key": "Diamond",
+        "weight": 8
+      }
+    ],
+    "43": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 67
+      },
+      {
+        "key": "Silver",
+        "weight": 77
+      },
+      {
+        "key": "Gold",
+        "weight": 52
+      },
+      {
+        "key": "Platinum",
+        "weight": 42
+      },
+      {
+        "key": "Sapphire",
+        "weight": 28
+      },
+      {
+        "key": "Ruby",
+        "weight": 28
+      },
+      {
+        "key": "Emerald",
+        "weight": 22
+      },
+      {
+        "key": "Mythril",
+        "weight": 14
+      },
+      {
+        "key": "Diamond",
+        "weight": 8
+      }
+    ],
+    "44": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 68
+      },
+      {
+        "key": "Silver",
+        "weight": 79
+      },
+      {
+        "key": "Gold",
+        "weight": 53
+      },
+      {
+        "key": "Platinum",
+        "weight": 42
+      },
+      {
+        "key": "Sapphire",
+        "weight": 28
+      },
+      {
+        "key": "Ruby",
+        "weight": 29
+      },
+      {
+        "key": "Emerald",
+        "weight": 22
+      },
+      {
+        "key": "Mythril",
+        "weight": 15
+      },
+      {
+        "key": "Diamond",
+        "weight": 9
+      }
+    ],
+    "45": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 69
+      },
+      {
+        "key": "Silver",
+        "weight": 80
+      },
+      {
+        "key": "Gold",
+        "weight": 54
+      },
+      {
+        "key": "Platinum",
+        "weight": 43
+      },
+      {
+        "key": "Sapphire",
+        "weight": 29
+      },
+      {
+        "key": "Ruby",
+        "weight": 30
+      },
+      {
+        "key": "Emerald",
+        "weight": 23
+      },
+      {
+        "key": "Mythril",
+        "weight": 15
+      },
+      {
+        "key": "Diamond",
+        "weight": 9
+      }
+    ],
+    "46": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 70
+      },
+      {
+        "key": "Silver",
+        "weight": 81
+      },
+      {
+        "key": "Gold",
+        "weight": 55
+      },
+      {
+        "key": "Platinum",
+        "weight": 44
+      },
+      {
+        "key": "Sapphire",
+        "weight": 30
+      },
+      {
+        "key": "Ruby",
+        "weight": 30
+      },
+      {
+        "key": "Emerald",
+        "weight": 24
+      },
+      {
+        "key": "Mythril",
+        "weight": 16
+      },
+      {
+        "key": "Diamond",
+        "weight": 9
+      }
+    ],
+    "47": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 70
+      },
+      {
+        "key": "Silver",
+        "weight": 83
+      },
+      {
+        "key": "Gold",
+        "weight": 56
+      },
+      {
+        "key": "Platinum",
+        "weight": 45
+      },
+      {
+        "key": "Sapphire",
+        "weight": 30
+      },
+      {
+        "key": "Ruby",
+        "weight": 31
+      },
+      {
+        "key": "Emerald",
+        "weight": 24
+      },
+      {
+        "key": "Mythril",
+        "weight": 16
+      },
+      {
+        "key": "Diamond",
+        "weight": 10
+      }
+    ],
+    "48": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 71
+      },
+      {
+        "key": "Silver",
+        "weight": 84
+      },
+      {
+        "key": "Gold",
+        "weight": 57
+      },
+      {
+        "key": "Platinum",
+        "weight": 46
+      },
+      {
+        "key": "Sapphire",
+        "weight": 31
+      },
+      {
+        "key": "Ruby",
+        "weight": 32
+      },
+      {
+        "key": "Emerald",
+        "weight": 25
+      },
+      {
+        "key": "Mythril",
+        "weight": 17
+      },
+      {
+        "key": "Diamond",
+        "weight": 10
+      }
+    ],
+    "49": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 72
+      },
+      {
+        "key": "Silver",
+        "weight": 85
+      },
+      {
+        "key": "Gold",
+        "weight": 58
+      },
+      {
+        "key": "Platinum",
+        "weight": 47
+      },
+      {
+        "key": "Sapphire",
+        "weight": 32
+      },
+      {
+        "key": "Ruby",
+        "weight": 33
+      },
+      {
+        "key": "Emerald",
+        "weight": 25
+      },
+      {
+        "key": "Mythril",
+        "weight": 17
+      },
+      {
+        "key": "Diamond",
+        "weight": 10
+      }
+    ],
+    "50": [
+      {
+        "key": "Stone",
+        "weight": 40
+      },
+      {
+        "key": "Copper",
+        "weight": 36
+      },
+      {
+        "key": "Iron",
+        "weight": 73
+      },
+      {
+        "key": "Silver",
+        "weight": 87
+      },
+      {
+        "key": "Gold",
+        "weight": 59
+      },
+      {
+        "key": "Platinum",
+        "weight": 48
+      },
+      {
+        "key": "Sapphire",
+        "weight": 32
+      },
+      {
+        "key": "Ruby",
+        "weight": 33
+      },
+      {
+        "key": "Emerald",
+        "weight": 26
+      },
+      {
+        "key": "Mythril",
+        "weight": 17
+      },
+      {
+        "key": "Diamond",
+        "weight": 10
+      }
+    ]
+  }
+}

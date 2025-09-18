@@ -453,6 +453,95 @@ section[id^="tab-"].active{ display:block; }
       { key:'Diamond', name:'다이아',   color:'#b9f6ff', hp:3000,  value:180, weight: 2,  tier:6, minFloor:22 },
     ];
 
+    const ORE_BY_KEY = {};
+    for(const oreDef of ORES){ ORE_BY_KEY[oreDef.key] = oreDef; }
+
+    const ORE_TABLE_URL = `ore_probabilities.json?v=${VERSION}`;
+    let oreTableLoaded = false;
+    let oreTablePromise = null;
+    let oreWeightTable = null;
+    let oreTableFloors = [];
+
+    function normalizeOreTableEntry(entry){
+      if(Array.isArray(entry)){
+        const [key, weight] = entry;
+        const weightNum = Number(weight);
+        if(typeof key === 'string' && Number.isFinite(weightNum)){
+          return { key, weight: weightNum };
+        }
+        return null;
+      }
+      if(entry && typeof entry === 'object'){
+        const key = entry.key || entry.id || entry.type;
+        const rawWeight = entry.weight ?? entry.w ?? entry.value;
+        const weightNum = Number(rawWeight);
+        if(typeof key === 'string' && Number.isFinite(weightNum)){
+          return { key, weight: weightNum };
+        }
+      }
+      return null;
+    }
+
+    function applyOreTableData(data){
+      if(!data || typeof data !== 'object') return false;
+      const floors = data.floors && typeof data.floors === 'object' ? data.floors : data;
+      const table = new Map();
+      const floorKeys = [];
+      for(const key of Object.keys(floors)){
+        const floorNum = Number(key);
+        if(!Number.isFinite(floorNum)) continue;
+        const raw = floors[key];
+        let entries = [];
+        if(Array.isArray(raw)){
+          entries = raw.map(normalizeOreTableEntry).filter(Boolean);
+        } else if(raw && typeof raw === 'object'){
+          entries = Object.keys(raw).map(k=> normalizeOreTableEntry({ key:k, weight: raw[k] })).filter(Boolean);
+        }
+        if(entries.length){
+          table.set(floorNum, entries);
+          floorKeys.push(floorNum);
+        }
+      }
+      if(!floorKeys.length) return false;
+      floorKeys.sort((a,b)=>a-b);
+      oreWeightTable = table;
+      oreTableFloors = floorKeys;
+      return true;
+    }
+
+    async function ensureOreTable(){
+      if(oreTableLoaded) return oreWeightTable;
+      if(typeof fetch !== 'function'){ oreTableLoaded = true; return null; }
+      if(!oreTablePromise){
+        oreTablePromise = fetch(ORE_TABLE_URL, { cache:'no-store' })
+          .then(res=>{
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          })
+          .then(data=>{
+            if(!applyOreTableData(data)){
+              console.warn('Ore probability table missing or invalid data');
+            }
+            oreTableLoaded = true;
+            return oreWeightTable;
+          })
+          .catch(err=>{
+            console.warn('Failed to load ore probability table', err);
+            oreTableLoaded = true;
+            oreWeightTable = null;
+            oreTableFloors = [];
+            return null;
+          });
+      }
+      try{
+        return await oreTablePromise;
+      }catch(err){
+        return null;
+      }
+    }
+
+    ensureOreTable();
+
     for(const o of ORES){ state.inventory[o.key]=state.inventory[o.key]||0; state.loot[o.key]=0; state.upgrades.oreMul[o.key]=state.upgrades.oreMul[o.key]||0; }
 
     const PET = { moveSpeed: 220, atkInterval: 0.55, sepRadius: 24, atkRange: 18 };
@@ -637,17 +726,41 @@ section[id^="tab-"].active{ display:block; }
     window.requestPlayGamesStatus = refreshPlayGamesStatus;
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
-      function eligibleOresForFloor(f){
-        const luck = state.aether?.luck||0;
-        return ORES.filter(o=> f >= o.minFloor).map(o=>{
-          const bonus = Math.max(0, f - o.minFloor);
-          const tierBoost = 1 + (o.tier-1)*0.03*bonus;
-          const rareMul = 1 + luck*0.08*(o.tier-1);
-          let weight = o.weight * tierBoost * rareMul;
-          if(o.key==='Silver' && f<3){ weight *= (f===1 ? 0.1 : 0.3); }
-          return { ...o, weight: Math.max(1, Math.round(weight)) };
-        });
+    function tableWeightsForFloor(f){
+      if(!oreWeightTable || !oreTableFloors.length) return null;
+      let candidate = null;
+      for(const floor of oreTableFloors){
+        if(floor>f) break;
+        candidate = floor;
       }
+      if(candidate===null) return null;
+      return oreWeightTable.get(candidate) || null;
+    }
+    function eligibleOresForFloor(f){
+      const luck = state.aether?.luck||0;
+      const tableEntries = tableWeightsForFloor(f);
+      if(tableEntries && tableEntries.length){
+        const pool = [];
+        for(const entry of tableEntries){
+          const ore = ORE_BY_KEY[entry.key];
+          if(!ore) continue;
+          let weight = Number(entry.weight);
+          if(!Number.isFinite(weight) || weight<=0) weight = 1;
+          const rareMul = 1 + luck*0.08*(ore.tier-1);
+          weight = Math.max(1, Math.round(weight * rareMul));
+          pool.push({ ...ore, weight });
+        }
+        if(pool.length) return pool;
+      }
+      return ORES.filter(o=> f >= o.minFloor).map(o=>{
+        const bonus = Math.max(0, f - o.minFloor);
+        const tierBoost = 1 + (o.tier-1)*0.03*bonus;
+        const rareMul = 1 + luck*0.08*(o.tier-1);
+        let weight = o.weight * tierBoost * rareMul;
+        if(o.key==='Silver' && f<3){ weight *= (f===1 ? 0.1 : 0.3); }
+        return { ...o, weight: Math.max(1, Math.round(weight)) };
+      });
+    }
     function gridRect(){
       const r = gridEl.getBoundingClientRect();
       if(r.width && r.height){
@@ -865,7 +978,8 @@ section[id^="tab-"].active{ display:block; }
     function floorHpMul(){ return 1 + 0.18*(state.floor-1); }
     function floorValMul(){ return 1 + 0.12*(state.floor-1); }
 
-    function startRun(){
+    async function startRun(){
+      await ensureOreTable();
       if(state.inRun) return;
       state.inRun = true;
       state.etherSpawned=false;
@@ -938,6 +1052,7 @@ section[id^="tab-"].active{ display:block; }
       const empties = state.grid.map((v,i)=> v? null : i).filter(v=>v!==null); if(empties.length===0) return;
       const idx = empties[Math.floor(Math.random()*empties.length)];
       const pool = eligibleOresForFloor(state.floor);
+      if(!pool || !pool.length){ console.warn('No ore weights available for floor', state.floor); return; }
       const base = randWeighted(pool);
       const elapsed = (performance.now() - state.runStartTs)/1000;
       const growth = 1 + 0.02 * Math.max(0, Math.floor(elapsed));
