@@ -326,7 +326,6 @@ section[id^="tab-"].active{ display:block; }
       async crit(){
         const played = await playOreHit(0.75);
         if(!played) beep(900,0.05,'square',0.045);
-        else beep(900,0.05,'square',0.03);
       },
       break(){ beep(240,0.07,'sawtooth',0.05); },
       skill(){ beep(700,0.08,'triangle',0.05); },
@@ -1035,7 +1034,11 @@ section[id^="tab-"].active{ display:block; }
       })
     });
     $('#toggleRunBtn').addEventListener('click', ()=>{ ensureAudio(); SFX.ui(); startRun(); });
-    $('#exitBtn').addEventListener('click', ()=>{ SFX.ui(); bankAndExit(false); });
+    $('#exitBtn').addEventListener('click', ()=>{
+      if(!state.inRun) return;
+      SFX.ui();
+      bankAndExit(false);
+    });
     $('#saveBtn').addEventListener('click', ()=>{ SFX.ui(); save(); });
     $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 전체 초기화할까요? (세이브 전부 삭제)')){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} try{ LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){} location.reload(); } });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
