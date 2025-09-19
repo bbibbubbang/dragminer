@@ -228,17 +228,17 @@ section[id^="tab-"].active{ display:block; }
   (()=>{
 
     const ORES = [
-      { key:'Stone',    name:'석재',     color:'#a3a3a3', hp:  60, value: 1,   tier:1 },
-      { key:'Copper',   name:'구리',     color:'#ef9a9a', hp: 120, value: 2,   tier:1 },
-      { key:'Iron',     name:'철',       color:'#90caf9', hp: 220, value: 4,   tier:2 },
-      { key:'Silver',   name:'은',       color:'#cfd8dc', hp: 380, value: 9,   tier:3 },
-      { key:'Gold',     name:'금',       color:'#f6e05e', hp: 650, value: 20,  tier:3 },
-      { key:'Platinum', name:'백금',     color:'#e5e7eb', hp: 900, value: 32,  tier:4 },
-      { key:'Sapphire', name:'사파이어', color:'#60a5fa', hp:1200, value: 48,  tier:4 },
-      { key:'Ruby',     name:'루비',     color:'#f43f5e', hp:1400, value: 60,  tier:5 },
-      { key:'Emerald',  name:'에메랄드', color:'#34d399', hp:1650, value: 80,  tier:5 },
-      { key:'Mythril',  name:'미스릴',   color:'#93c5fd', hp:2200, value:120, tier:6 },
-      { key:'Diamond',  name:'다이아몬드', color:'#b9f6ff', hp:3000, value:180, tier:6 }
+      { key:'Stone',    name:'석재',     color:'#a3a3a3', hp:  60, value: 10,   tier:1 },
+      { key:'Copper',   name:'구리',     color:'#ef9a9a', hp: 120, value: 20,   tier:1 },
+      { key:'Iron',     name:'철',       color:'#90caf9', hp: 220, value: 40,   tier:2 },
+      { key:'Silver',   name:'은',       color:'#cfd8dc', hp: 380, value: 90,   tier:3 },
+      { key:'Gold',     name:'금',       color:'#f6e05e', hp: 650, value: 200,  tier:3 },
+      { key:'Platinum', name:'백금',     color:'#e5e7eb', hp: 900, value: 320,  tier:4 },
+      { key:'Sapphire', name:'사파이어', color:'#60a5fa', hp:1200, value: 480,  tier:4 },
+      { key:'Ruby',     name:'루비',     color:'#f43f5e', hp:1400, value: 600,  tier:5 },
+      { key:'Emerald',  name:'에메랄드', color:'#34d399', hp:1650, value: 800,  tier:5 },
+      { key:'Mythril',  name:'미스릴',   color:'#93c5fd', hp:2200, value:1200, tier:6 },
+      { key:'Diamond',  name:'다이아몬드', color:'#b9f6ff', hp:3000, value:1800, tier:6 }
     ];
     window.ORE_DATA = ORES;
     const ORE_BY_KEY = new Map(ORES.map(ore=>[ore.key, ore]));
