@@ -732,18 +732,45 @@ section[id^="tab-"].active{ display:block; }
     function gridRect(){
       const r = gridEl.getBoundingClientRect();
       if(r.width && r.height){
-        if(!gridRectCache){
-          gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
-        } else {
-          const width = Math.max(gridRectCache.width, r.width);
-          const height = Math.max(gridRectCache.height, r.height);
-          gridRectCache = {left:r.left, top:r.top, width, height, right:r.left + width, bottom:r.top + height};
+        if(gridRectCache){
+          const widthChanged = Math.abs(gridRectCache.width - r.width) > 0.5;
+          const heightChanged = Math.abs(gridRectCache.height - r.height) > 0.5;
+          if(widthChanged || heightChanged){
+            const prev = gridRectCache;
+            const oldInnerW = Math.max(1, prev.width - 52);
+            const oldInnerH = Math.max(1, prev.height - 52);
+            const newInnerW = Math.max(1, r.width - 52);
+            const newInnerH = Math.max(1, r.height - 52);
+            for(let i=0;i<state.grid.length;i++){
+              const ore = state.grid[i];
+              if(!ore) continue;
+              const nx = Math.max(0, Math.min(1, (ore.x - 26) / oldInnerW));
+              const ny = Math.max(0, Math.min(1, (ore.y - 26) / oldInnerH));
+              ore.x = 26 + nx * newInnerW;
+              ore.y = 26 + ny * newInnerH;
+            }
+            const oldPetW = Math.max(1, prev.width - 16);
+            const oldPetH = Math.max(1, prev.height - 16);
+            const newPetW = Math.max(1, r.width - 16);
+            const newPetH = Math.max(1, r.height - 16);
+            for(const pet of state.pets){
+              const nx = Math.max(0, Math.min(1, (pet.x - 8) / oldPetW));
+              const ny = Math.max(0, Math.min(1, (pet.y - 8) / oldPetH));
+              pet.x = 8 + nx * newPetW;
+              pet.y = 8 + ny * newPetH;
+            }
+          }
         }
+        gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
+      } else if(!gridRectCache){
+        gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
+      } else {
+        gridRectCache = {left:r.left, top:r.top, width:gridRectCache.width, height:gridRectCache.height, right:r.left + gridRectCache.width, bottom:r.top + gridRectCache.height};
       }
-      return gridRectCache || {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
+      return gridRectCache;
     }
     function cellCenter(idx){ const o = state.grid[idx]; return { x:o.x, y:o.y }; }
-    function oreIndexFromPoint(x,y){ for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const h=26; if(x>=o.x-h && x<=o.x+h && y>=o.y-h && y<=o.y+h) return i; } return -1; }
+    function oreIndexFromPoint(x,y){ const gr = gridRect(); const localX = x - gr.left; const localY = y - gr.top; if(localX<0 || localY<0 || localX>gr.width || localY>gr.height) return -1; for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const h=26; if(localX>=o.x-h && localX<=o.x+h && localY>=o.y-h && localY<=o.y+h) return i; } return -1; }
 
     function sellMultiplier(key){
       const lvl = state.upgrades.oreMul[key]||0;
@@ -783,8 +810,8 @@ section[id^="tab-"].active{ display:block; }
       document.body.classList.toggle('lock-v', isDungeonVisible);
     }
 
-    function renderGrid(){ gridEl.innerHTML=''; const gr=gridRect();
-      for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const localX=ore.x-gr.left-26; const localY=ore.y-gr.top-26; el.style.transform=`translate(${localX}px, ${localY}px)`; el.dataset.idx=i; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; el.appendChild(hp); gridEl.appendChild(el); ore.el = el; }
+    function renderGrid(){ gridEl.innerHTML=''; gridRect();
+      for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const localX=ore.x-26; const localY=ore.y-26; el.style.transform=`translate(${localX}px, ${localY}px)`; el.dataset.idx=i; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; el.appendChild(hp); gridEl.appendChild(el); ore.el = el; }
       renderPets(); }
 
     function renderInventory(){ const box=$('#inventoryList'); box.innerHTML='';
@@ -941,7 +968,7 @@ section[id^="tab-"].active{ display:block; }
           SFX.skill(); break;
         case 'haste': state.skillHasteUntil = performance.now()+5000; restartSpawnTimer(); SFX.skill(); break;
         case 'sonic':
-          const gr = gridRect(); const cx = (gr.left+gr.right)/2, cy=(gr.top+gr.bottom)/2;
+          const gr = gridRect(); const cx = gr.width/2, cy = gr.height/2;
           const idx = findNearestOreIdx(cx,cy);
           if(idx>=0){
             const o=state.grid[idx];
@@ -1039,8 +1066,10 @@ section[id^="tab-"].active{ display:block; }
       const hp = Math.round(base.hp*floorHpMul()*growth*(state.skillAtkBuffUntil>performance.now()?0.9:1));
       const value = Math.round(base.value*floorValMul());
       const gr = gridRect();
-      const x = gr.left + 26 + Math.random()*(gr.width-52);
-      const y = gr.top + 26 + Math.random()*(gr.height-52);
+      const width = Math.max(52, gr.width);
+      const height = Math.max(52, gr.height);
+      const x = 26 + Math.random()*(width-52);
+      const y = 26 + Math.random()*(height-52);
       state.grid[idx] = { type: base.key, label: base.name, hp, maxHp: hp, value, bg: base.color, x, y };
       renderGrid();
     }
@@ -1051,8 +1080,10 @@ section[id^="tab-"].active{ display:block; }
         const baseE = 1250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
         const hp = Math.round(baseE * Math.pow(1+r, exp));
         const gr = gridRect();
-        const x = gr.left + 26 + Math.random()*(gr.width-52);
-        const y = gr.top + 26 + Math.random()*(gr.height-52);
+        const width = Math.max(52, gr.width);
+        const height = Math.max(52, gr.height);
+        const x = 26 + Math.random()*(width-52);
+        const y = 26 + Math.random()*(height-52);
         state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7', x, y }; renderGrid(); }
 
     function onOreBroken(idx, ore){
@@ -1098,10 +1129,12 @@ section[id^="tab-"].active{ display:block; }
       state.pets = [];
       const count = (state.upgrades.pet.level || 0) + (state.passive.petPlus || 0) + (state.aether?.petPlus||0);
       const gr = gridRect();
-      for(let i=0;i<count;i++){ state.pets.push({ x: gr.left + Math.random()*gr.width, y: gr.top + Math.random()*gr.height, vx:0, vy:0, targetIdx:-1, cd:0 }); }
+      const width = Math.max(16, gr.width);
+      const height = Math.max(16, gr.height);
+      for(let i=0;i<count;i++){ state.pets.push({ x: 8 + Math.random()*(width-16), y: 8 + Math.random()*(height-16), vx:0, vy:0, targetIdx:-1, cd:0 }); }
       renderPets();
     }
-    function renderPets(){ gridEl.querySelectorAll('.pet').forEach(p=>p.remove()); const gr = gridRect(); for(const p of state.pets){ const el=document.createElement('div'); el.className='pet'; const localX = p.x - gr.left - 8; const localY = p.y - gr.top - 8; el.style.transform = `translate(${localX}px, ${localY}px)`; gridEl.appendChild(el); } }
+    function renderPets(){ gridEl.querySelectorAll('.pet').forEach(p=>p.remove()); gridRect(); for(const p of state.pets){ const el=document.createElement('div'); el.className='pet'; const localX = p.x - 8; const localY = p.y - 8; el.style.transform = `translate(${localX}px, ${localY}px)`; gridEl.appendChild(el); } }
     function findNearestOreIdx(x,y){ let best=-1, bestD=1e9; for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const d=Math.hypot(ore.x-x, ore.y-y); if(d<bestD){ bestD=d; best=i; } } return best; }
     function petsFrame(ts){ if(!state.inRun) return; const gr=gridRect(); const dt=Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016); state.lastAnimTs=ts; for(const p of state.pets){ if(p.targetIdx<0 || !state.grid[p.targetIdx]) p.targetIdx = findNearestOreIdx(p.x,p.y); if(p.targetIdx>=0){ const c=cellCenter(p.targetIdx); const dx=c.x-p.x, dy=c.y-p.y; const dist=Math.hypot(dx,dy)||1; const speed = dist<28 ? PET.moveSpeed*(dist/28) : PET.moveSpeed; const steerX = (dx/dist)*speed - p.vx; const steerY = (dy/dist)*speed - p.vy; p.vx += steerX*0.12; p.vy += steerY*0.12; } else { p.vx += (Math.random()-0.5)*10*dt; p.vy += (Math.random()-0.5)*10*dt; } }
       for(let i=0;i<state.pets.length;i++){
@@ -1127,8 +1160,8 @@ section[id^="tab-"].active{ display:block; }
       for(const p of state.pets){
         p.x += p.vx*dt;
         p.y += p.vy*dt;
-        p.x = Math.max(gr.left+8, Math.min(gr.right-8, p.x));
-        p.y = Math.max(gr.top+8, Math.min(gr.bottom-8, p.y));
+        p.x = Math.max(8, Math.min(gr.width-8, p.x));
+        p.y = Math.max(8, Math.min(gr.height-8, p.y));
         if(p.targetIdx>=0){
           const ore = state.grid[p.targetIdx];
           if(!ore){
