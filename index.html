@@ -1123,7 +1123,25 @@ section[id^="tab-"].active{ display:block; }
           }
         }
       }
-      for(const p of state.pets){ p.x += p.vx*dt; p.y += p.vy*dt; p.x = Math.max(gr.left+8, Math.min(gr.right-8, p.x)); p.y = Math.max(gr.top+8, Math.min(gr.bottom-8, p.y)); if(p.targetIdx>=0){ const c=cellCenter(p.targetIdx); const dist=Math.hypot(c.x-p.x, c.y-p.y); p.cd -= dt; if(dist<=PET.atkRange && p.cd<=0){ p.cd = PET.atkInterval; hit(p.targetIdx,'pet'); } } }
+      for(const p of state.pets){
+        p.x += p.vx*dt;
+        p.y += p.vy*dt;
+        p.x = Math.max(gr.left+8, Math.min(gr.right-8, p.x));
+        p.y = Math.max(gr.top+8, Math.min(gr.bottom-8, p.y));
+        if(p.targetIdx>=0){
+          const ore = state.grid[p.targetIdx];
+          if(!ore){
+            p.targetIdx = -1;
+            continue;
+          }
+          const dist = Math.hypot(ore.x - p.x, ore.y - p.y);
+          p.cd -= dt;
+          if(dist<=PET.atkRange && p.cd<=0){
+            p.cd = PET.atkInterval;
+            hit(p.targetIdx,'pet');
+          }
+        }
+      }
       renderPets(); requestAnimationFrame(petsFrame); }
 
     document.querySelectorAll('.tab-btn').forEach(btn=>{
