@@ -520,6 +520,19 @@ section[id^="tab-"].active{ display:block; }
     const screenEl = $('.screen');
     let gridRectCache = null;
 
+    const ORE_SIZE = 52;
+    const ORE_RADIUS = ORE_SIZE / 2;
+    const GRID_SAFE_MARGIN = 6;
+
+    function spawnAxisInfo(size){
+      const safeSize = Math.max(ORE_SIZE, size || 0);
+      const extra = Math.max(0, safeSize - ORE_SIZE);
+      const margin = Math.min(GRID_SAFE_MARGIN, extra / 2);
+      const span = Math.max(0, safeSize - 2 * (ORE_RADIUS + margin));
+      const start = ORE_RADIUS + margin;
+      return { start, span };
+    }
+
     const playGamesCardEl = document.getElementById('playGamesCard');
     const playGamesStatusEl = document.getElementById('playGamesStatus');
     const playGamesLoginBtn = document.getElementById('playGamesLoginBtn');
@@ -737,17 +750,19 @@ section[id^="tab-"].active{ display:block; }
           const heightChanged = Math.abs(gridRectCache.height - r.height) > 0.5;
           if(widthChanged || heightChanged){
             const prev = gridRectCache;
-            const oldInnerW = Math.max(1, prev.width - 52);
-            const oldInnerH = Math.max(1, prev.height - 52);
-            const newInnerW = Math.max(1, r.width - 52);
-            const newInnerH = Math.max(1, r.height - 52);
+            const oldAxisX = spawnAxisInfo(prev.width);
+            const oldAxisY = spawnAxisInfo(prev.height);
+            const newAxisX = spawnAxisInfo(r.width);
+            const newAxisY = spawnAxisInfo(r.height);
+            const oldInnerW = Math.max(1, oldAxisX.span || 0);
+            const oldInnerH = Math.max(1, oldAxisY.span || 0);
             for(let i=0;i<state.grid.length;i++){
               const ore = state.grid[i];
               if(!ore) continue;
-              const nx = Math.max(0, Math.min(1, (ore.x - 26) / oldInnerW));
-              const ny = Math.max(0, Math.min(1, (ore.y - 26) / oldInnerH));
-              ore.x = 26 + nx * newInnerW;
-              ore.y = 26 + ny * newInnerH;
+              const nx = Math.max(0, Math.min(1, (ore.x - oldAxisX.start) / oldInnerW));
+              const ny = Math.max(0, Math.min(1, (ore.y - oldAxisY.start) / oldInnerH));
+              ore.x = newAxisX.start + nx * (newAxisX.span || 0);
+              ore.y = newAxisY.start + ny * (newAxisY.span || 0);
             }
             const oldPetW = Math.max(1, prev.width - 16);
             const oldPetH = Math.max(1, prev.height - 16);
@@ -770,7 +785,7 @@ section[id^="tab-"].active{ display:block; }
       return gridRectCache;
     }
     function cellCenter(idx){ const o = state.grid[idx]; return { x:o.x, y:o.y }; }
-    function oreIndexFromPoint(x,y){ const gr = gridRect(); const localX = x - gr.left; const localY = y - gr.top; if(localX<0 || localY<0 || localX>gr.width || localY>gr.height) return -1; for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const h=26; if(localX>=o.x-h && localX<=o.x+h && localY>=o.y-h && localY<=o.y+h) return i; } return -1; }
+    function oreIndexFromPoint(x,y){ const gr = gridRect(); const localX = x - gr.left; const localY = y - gr.top; if(localX<0 || localY<0 || localX>gr.width || localY>gr.height) return -1; for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const h=ORE_RADIUS; if(localX>=o.x-h && localX<=o.x+h && localY>=o.y-h && localY<=o.y+h) return i; } return -1; }
 
     function sellMultiplier(key){
       const lvl = state.upgrades.oreMul[key]||0;
@@ -811,7 +826,7 @@ section[id^="tab-"].active{ display:block; }
     }
 
     function renderGrid(){ gridEl.innerHTML=''; gridRect();
-      for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const localX=ore.x-26; const localY=ore.y-26; el.style.transform=`translate(${localX}px, ${localY}px)`; el.dataset.idx=i; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; el.appendChild(hp); gridEl.appendChild(el); ore.el = el; }
+      for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const localX=ore.x-ORE_RADIUS; const localY=ore.y-ORE_RADIUS; el.style.transform=`translate(${localX}px, ${localY}px)`; el.dataset.idx=i; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; el.appendChild(hp); gridEl.appendChild(el); ore.el = el; }
       renderPets(); }
 
     function renderInventory(){ const box=$('#inventoryList'); box.innerHTML='';
@@ -1065,10 +1080,10 @@ section[id^="tab-"].active{ display:block; }
       const hp = Math.round(base.hp*floorHpMul()*growth*(state.skillAtkBuffUntil>performance.now()?0.9:1));
       const value = Math.round(base.value*floorValMul());
       const gr = gridRect();
-      const width = Math.max(52, gr.width);
-      const height = Math.max(52, gr.height);
-      const x = 26 + Math.random()*(width-52);
-      const y = 26 + Math.random()*(height-52);
+      const axisX = spawnAxisInfo(gr.width);
+      const axisY = spawnAxisInfo(gr.height);
+      const x = axisX.start + (axisX.span>0 ? Math.random()*axisX.span : 0);
+      const y = axisY.start + (axisY.span>0 ? Math.random()*axisY.span : 0);
       state.grid[idx] = { type: base.key, label: base.name, hp, maxHp: hp, value, bg: base.color, x, y };
       renderGrid();
     }
@@ -1079,10 +1094,10 @@ section[id^="tab-"].active{ display:block; }
         const baseE = 1250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
         const hp = Math.round(baseE * Math.pow(1+r, exp));
         const gr = gridRect();
-        const width = Math.max(52, gr.width);
-        const height = Math.max(52, gr.height);
-        const x = 26 + Math.random()*(width-52);
-        const y = 26 + Math.random()*(height-52);
+        const axisX = spawnAxisInfo(gr.width);
+        const axisY = spawnAxisInfo(gr.height);
+        const x = axisX.start + (axisX.span>0 ? Math.random()*axisX.span : 0);
+        const y = axisY.start + (axisY.span>0 ? Math.random()*axisY.span : 0);
         state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7', x, y }; renderGrid(); }
 
     function onOreBroken(idx, ore){
