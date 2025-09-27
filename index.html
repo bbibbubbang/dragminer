@@ -994,7 +994,6 @@ section[id^="tab-"].active{ display:block; }
       state.grid = new Array(25).fill(null);
       for(const o of ORES){ state.loot[o.key]=0; }
       Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]);
-      activateTab('dungeon');
       restartSpawnTimer();
       state.runStartTs = performance.now();
       startTick();
