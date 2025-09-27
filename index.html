@@ -967,6 +967,7 @@ section[id^="tab-"].active{ display:block; }
       state.grid = new Array(25).fill(null);
       for(const o of ORES){ state.loot[o.key]=0; }
       Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]);
+      activateTab('dungeon');
       restartSpawnTimer();
       state.runStartTs = performance.now();
       startTick();
@@ -1144,24 +1145,42 @@ section[id^="tab-"].active{ display:block; }
       }
       renderPets(); requestAnimationFrame(petsFrame); }
 
+    const TAB_IDS = ['dungeon','inventory','upgrades','skills','aether','settings'];
+    function activateTab(tabId){
+      const target = TAB_IDS.includes(tabId) ? tabId : 'dungeon';
+      document.querySelectorAll('.tab-btn').forEach(b=>{
+        const active = b.dataset.tab === target;
+        b.classList.toggle('active', active);
+      });
+      TAB_IDS.forEach(id=>{
+        const section = document.querySelector('#tab-'+id);
+        if(!section) return;
+        const active = id === target;
+        section.style.display = active ? (id==='dungeon' ? 'flex' : 'block') : 'none';
+        section.classList.toggle('active', active);
+      });
+      screenEl.scrollTop = 0;
+      screenEl.style.overflowY = target==='dungeon' ? 'hidden' : 'auto';
+      renderTop();
+      if(target==='dungeon'){
+        renderGrid();
+      } else if(target==='skills'){
+        renderSkills();
+      } else if(target==='aether'){
+        renderAether();
+      } else if(target==='inventory'){
+        renderInventory();
+      } else if(target==='settings'){
+        detectPlayGamesBridge();
+        refreshPlayGamesStatus();
+        updatePlayGamesUI();
+      }
+    }
+
     document.querySelectorAll('.tab-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         SFX.ui();
-        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
-        const t=btn.dataset.tab;
-        ['dungeon','inventory','upgrades','skills','aether','settings'].forEach(id=>{
-          document.querySelector('#tab-'+id).style.display = (id===t? 'block':'none');
-        });
-        screenEl.scrollTop = 0;
-        screenEl.style.overflowY = t==='dungeon' ? 'hidden' : 'auto';
-        renderTop();
-        if(t==='dungeon'){
-          renderGrid();
-        }
-        if(t==='skills') renderSkills();
-        if(t==='aether') renderAether();
-        if(t==='inventory') renderInventory();
-        if(t==='settings'){ detectPlayGamesBridge(); refreshPlayGamesStatus(); updatePlayGamesUI(); }
+        activateTab(btn.dataset.tab);
       })
     });
     $('#toggleRunBtn').addEventListener('click', ()=>{ ensureAudio(); SFX.ui(); startRun(); });
@@ -1285,6 +1304,7 @@ section[id^="tab-"].active{ display:block; }
     async function init(){
       await loadSpawnTable();
       boot();
+      activateTab(document.querySelector('.tab-btn.active')?.dataset.tab || 'dungeon');
     }
     init();
 
