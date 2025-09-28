@@ -496,6 +496,7 @@ section[id^="tab-"].active{ display:block; }
       settings: { autoSell:false },
 
       lastTickReal: 0,
+      visibilityPauseTs: 0,
     };
 
     const AUTO_CHALLENGE_COST = 300;
@@ -1686,6 +1687,38 @@ section[id^="tab-"].active{ display:block; }
       state.lastAnimTs = performance.now(); requestAnimationFrame(petsFrame);
     }
 
+    function pauseRunForVisibility(){
+      if(!state.inRun) return;
+      if(state.visibilityPauseTs) return;
+      state.visibilityPauseTs = performance.now();
+      clearInterval(state.timers.spawn); state.timers.spawn = null;
+      clearInterval(state.timers.tick); state.timers.tick = null;
+    }
+
+    function resumeRunAfterVisibility(){
+      if(!state.inRun) return;
+      if(!state.visibilityPauseTs) return;
+      const now = performance.now();
+      const pausedDuration = Math.max(0, now - state.visibilityPauseTs);
+      state.visibilityPauseTs = 0;
+      if(Number.isFinite(pausedDuration) && pausedDuration > 0){
+        state.runStartTs += pausedDuration;
+        if(state.skillHasteUntil > 0 && Number.isFinite(state.skillHasteUntil)){
+          state.skillHasteUntil += pausedDuration;
+        }
+        if(state.skillAtkBuffUntil !== Infinity && Number.isFinite(state.skillAtkBuffUntil) && state.skillAtkBuffUntil > 0){
+          state.skillAtkBuffUntil += pausedDuration;
+        }
+        if(state.runFlags && Number.isFinite(state.runFlags.berserkBoostPrevExpiry)){
+          state.runFlags.berserkBoostPrevExpiry += pausedDuration;
+        }
+      }
+      state.lastTickReal = now;
+      state.lastAnimTs = now;
+      restartSpawnTimer();
+      startTick();
+    }
+
     function restartSpawnTimer(){
       const level = state.upgrades.spawn.level;
       const baseInterval = (typeof window.spawnIntervalForLevel === 'function')
@@ -2386,6 +2419,13 @@ section[id^="tab-"].active{ display:block; }
     document.getElementById('autoChallengeChk').addEventListener('change', (e)=>{
       if(!state.aether.autoChallengeOwned){ e.target.checked=false; return; }
       state.aether.autoChallengeEnabled = e.target.checked; save();
+    });
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.hidden){
+        pauseRunForVisibility();
+      } else {
+        resumeRunAfterVisibility();
+      }
     });
     document.getElementById('rebirthBuyBtn').addEventListener('click', ()=>{
       if(state.highestFloor < 20) return;
