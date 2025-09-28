@@ -177,7 +177,7 @@ section[id^="tab-"].active{ display:block; }
         </div>
         <div class="ae-card">
           <h4>환생 준비</h4>
-          <div class="ae-meta">지하 20층 이상에서 환생 가능. 아래 보너스를 이번 환생에 함께 구매할 수 있습니다.</div>
+          <div class="ae-meta">지하 20층 이상에서 환생 가능. 아래 보너스를 이번 환생에 함께 구매할 수 있습니다. 에테르로 구매한 스킬들은 환생해도 초기화되지 않습니다.</div>
           <div id="rebirthPerks" class="aether-grid" style="margin-top:8px"></div>
           <div class="row" style="justify-content:space-between;margin-top:8px">
             <div class="mono">총 비용: <b id="rebirthTotal">0</b> 에테르</div>
@@ -308,6 +308,29 @@ section[id^="tab-"].active{ display:block; }
     const ACTIVE_SKILLS = window.ACTIVE_SKILL_DATA;
     const BERSERK_SKILL = ACTIVE_SKILLS.find(s=>s.key==='berserk');
     const PASSIVE_SKILLS = window.PASSIVE_SKILL_DATA;
+    const PASSIVE_DISPLAY_INFO = {
+      power: { label:'기초공격력', unit:'', perLevel:1 },
+      sharp: {
+        label:'치명타 확률',
+        unit:'%',
+        calcTotal: (level) => Math.min(40, level * 3),
+        calcDelta: (level) => {
+          const current = Math.min(40, level * 3);
+          const next = Math.min(40, (level + 1) * 3);
+          return Math.max(0, next - current);
+        },
+      },
+      merchant: { label:'판매 보너스', unit:'%', perLevel:10 },
+      petmaster: {
+        label:'펫',
+        unit:'마리',
+        perLevel:1,
+        formatDelta: (value) => {
+          const num = Number.isFinite(value) ? value : 0;
+          return Number.isInteger(num) ? num.toString() : num.toFixed(2).replace(/\.0+$/,'').replace(/0+$/,'');
+        },
+      },
+    };
     const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
     const UPGRADE_INFO = window.UPGRADE_INFO;
     const UPGRADE_DEFAULTS = window.UPGRADE_DEFAULTS;
@@ -949,7 +972,13 @@ section[id^="tab-"].active{ display:block; }
 
     function calcAtk() {
       const L = state.upgrades.atk?.level || 1;
-      const base = state.player.atkBase || 10;
+      const powerPassive = PASSIVE_SKILLS.find((sk) => sk.key === 'power');
+      const maxPowerLevel = powerPassive ? passiveMaxLevel(powerPassive) : 0;
+      const ownedPower = Math.min(maxPowerLevel, state.skillsOwnedPassive?.power || 0);
+      const baseFloor = 10 + ownedPower;
+      const storedBase = (typeof state.player.atkBase === 'number') ? state.player.atkBase : 10;
+      const base = Math.max(storedBase, baseFloor);
+      state.player.atkBase = base;
       const ATK_PER_LVL = 0.12;
       const ATK_MILE    = 0.35;
       const per   = Math.pow(1 + ATK_PER_LVL, Math.max(0, L - 1));
@@ -1136,9 +1165,17 @@ section[id^="tab-"].active{ display:block; }
         const cost = perkCost(p);
         const checked = !!rebirthPick[p.key];
         const row = document.createElement('div'); row.className='skill-card';
-        row.innerHTML = `<div class="row" style="justify-content:space-between"><b>${p.name}</b><span class="mono">${p.desc}</span></div>
-                         <div class="row" style="justify-content:space-between;margin-top:6px">
-                           <div class="mono">레벨 ${lvl}/${p.max} · 비용 ${cost} 에테르</div>
+        const header = `<div class="row" style="justify-content:space-between"><b>${p.name}</b><span class="mono">Lv ${lvl}/${p.max}</span></div>`;
+        const desc = `<div class="mono" style="opacity:.8;margin:4px 0 6px 0">${p.desc}</div>`;
+        let extra = '';
+        if(p.key === 'etherHaste'){
+          const delay = Math.max(0, 15 - (lvl * 0.5));
+          const formatted = Number.isInteger(delay) ? delay.toFixed(0) : delay.toFixed(1);
+          extra = `<div class="mono" style="margin:0 0 6px 0">현재 등장: ${formatted}초</div>`;
+        }
+        row.innerHTML = header + desc + extra +
+                         `<div class="row" style="justify-content:space-between;margin-top:6px">
+                           <div class="mono">비용 ${cost} 에테르</div>
                            <label class="row" style="gap:6px;align-items:center">
                              <input type="checkbox" ${checked?'checked':''} ${maxed?'disabled':''} data-perk="${p.key}">
                              <span>${maxed?'최대':''}선택</span>
@@ -1172,6 +1209,40 @@ section[id^="tab-"].active{ display:block; }
       return changed;
     }
 
+    function passiveMaxLevel(sk){
+      if(typeof sk.maxLevel === 'number' && sk.maxLevel > 0){ return sk.maxLevel; }
+      if(sk.once){ return 1; }
+      return 20;
+    }
+
+    function formatPassiveValue(value, cfg){
+      const num = Number.isFinite(value) ? value : 0;
+      let str;
+      if(cfg && typeof cfg.decimals === 'number'){
+        str = num.toFixed(cfg.decimals);
+      }else if(Number.isInteger(num)){
+        str = num.toString();
+      }else{
+        str = num.toFixed(2).replace(/\.0+$/,'').replace(/0+$/,'');
+      }
+      if(cfg?.unit === '%'){ return `${str}%`; }
+      if(cfg?.unit){ return `${str}${cfg.unit}`; }
+      return str;
+    }
+
+    function buildPassiveStatLine(sk, level, isMaxed){
+      const cfg = PASSIVE_DISPLAY_INFO[sk.key];
+      if(!cfg){ return ''; }
+      const safeLevel = Math.max(0, level);
+      const totalValue = cfg.calcTotal ? cfg.calcTotal(safeLevel) : safeLevel * (cfg.perLevel ?? 0);
+      const baseText = `${cfg.label} ${formatPassiveValue(totalValue, cfg)}`;
+      if(isMaxed){ return baseText; }
+      const deltaValue = cfg.calcDelta ? cfg.calcDelta(safeLevel) : (cfg.perLevel ?? 0);
+      if(!deltaValue){ return baseText; }
+      const deltaText = cfg.formatDelta ? cfg.formatDelta(deltaValue, cfg) : formatPassiveValue(deltaValue, cfg);
+      return `${baseText} (+${deltaText})`;
+    }
+
     function renderSkills(){
       ensurePassiveDefaults();
       const slotsUpdated = syncSkillSlotsWithOwned();
@@ -1190,17 +1261,34 @@ section[id^="tab-"].active{ display:block; }
 
       const shopP = $('#skillShopPassive'); shopP.innerHTML='';
       for(const sk of PASSIVE_SKILLS){
-        const owned = !!state.skillsOwnedPassive[sk.key];
+        const ownedCount = state.skillsOwnedPassive[sk.key] || 0;
+        const maxLevel = passiveMaxLevel(sk);
+        const displayLevel = Math.min(ownedCount, maxLevel);
+        const isMaxed = ownedCount >= maxLevel;
+        const owned = ownedCount > 0;
+        const levelLabel = `Lv ${displayLevel}/${maxLevel}`;
+        const statLine = buildPassiveStatLine(sk, displayLevel, isMaxed);
         const card = document.createElement('div'); card.className = 'skill-card';
-        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">패시브</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned && sk.once?'disabled':''}>${owned?(sk.once?'보유중':'추가 구매'):'구매'}</button></div>`;
+        const descBlock = sk.desc ? `<div class="mono" style="opacity:.8;margin:4px 0 ${statLine?4:8}px 0">${sk.desc}</div>` : '';
+        const statBlock = statLine ? `<div class="mono" style="margin:0 0 8px 0">${statLine}</div>` : '';
+        const buttonLabel = isMaxed
+          ? (sk.once ? '보유중' : '최대 레벨')
+          : (owned ? '추가 구매' : '구매');
+        const buttonDisabled = isMaxed;
+        const buttonRow = `<div class="row" style="justify-content:space-between${(!statLine && !sk.desc)?';margin-top:8px':''}"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${buttonDisabled?'disabled':''}>${buttonLabel}</button></div>`;
+        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">${levelLabel}</span></div>`+
+                         descBlock +
+                         statBlock +
+                         buttonRow;
         const buyBtn = card.querySelector('.btn');
         if(buyBtn){
           buyBtn.addEventListener('click', ()=>{
+            if(ownedCount >= maxLevel){ toast('최대 레벨입니다.'); SFX.deny(); return; }
             if(!spendAe(sk.ae)) { SFX.deny(); return; }
-            if(sk.once && owned){ toast('이미 보유'); SFX.deny(); return; }
             if(!state.skillsOwnedPassive[sk.key]) state.skillsOwnedPassive[sk.key]=0;
-            state.skillsOwnedPassive[sk.key] += 1;
-            if(typeof sk.apply === 'function'){ sk.apply({ state, spawnPets }); }
+            const nextLevel = Math.min(maxLevel, state.skillsOwnedPassive[sk.key] + 1);
+            state.skillsOwnedPassive[sk.key] = nextLevel;
+            if(typeof sk.apply === 'function'){ sk.apply({ state, restartSpawnTimer, spawnPets }); }
             ensurePassiveDefaults();
             toast(`${sk.name} 적용!`); SFX.ui(); save(); renderSkills(); renderUpgrades(); renderTop();
           });
@@ -1369,8 +1457,8 @@ section[id^="tab-"].active{ display:block; }
         if(!state.inRun) return;
         const now = performance.now();
         const elapsed = (now - state.runStartTs)/1000;
-        let etherDelay = 10 + Math.min(state.floor*0.5, 20) - (state.aether?.etherHaste||0);
-        etherDelay = Math.max(5, etherDelay);
+        const etherHasteLevel = state.aether?.etherHaste || 0;
+        const etherDelay = 15 - (etherHasteLevel * 0.5);
         if(!state.etherSpawned && elapsed >= etherDelay){ spawnEther(); }
         state.timeLeft = Math.max(0, +(state.timeLeft - 0.1).toFixed(1));
         for(const k of Object.keys(state.skillCooldowns)){ state.skillCooldowns[k] = Math.max(0, state.skillCooldowns[k]-0.1); }
