@@ -471,6 +471,7 @@ section[id^="tab-"].active{ display:block; }
       inRun:false,
       timeLeft: 0.0,
       timers: { spawn:null, tick:null },
+      animFrameId: 0,
       pets: [],
       pointerState: {},
       lastAnimTs: 0,
@@ -1684,7 +1685,12 @@ section[id^="tab-"].active{ display:block; }
         if(state.timeLeft<=0){ bankAndExit(false); return; }
         renderTop(); renderSkillBar();
       },100);
-      state.lastAnimTs = performance.now(); requestAnimationFrame(petsFrame);
+      state.lastAnimTs = performance.now();
+      if(state.animFrameId){
+        cancelAnimationFrame(state.animFrameId);
+        state.animFrameId = 0;
+      }
+      state.animFrameId = requestAnimationFrame(petsFrame);
     }
 
     function pauseRunForVisibility(){
@@ -1693,6 +1699,10 @@ section[id^="tab-"].active{ display:block; }
       state.visibilityPauseTs = performance.now();
       clearInterval(state.timers.spawn); state.timers.spawn = null;
       clearInterval(state.timers.tick); state.timers.tick = null;
+      if(state.animFrameId){
+        cancelAnimationFrame(state.animFrameId);
+        state.animFrameId = 0;
+      }
     }
 
     function resumeRunAfterVisibility(){
@@ -2156,7 +2166,10 @@ section[id^="tab-"].active{ display:block; }
       return false;
     }
     function petsFrame(ts){
-      if(!state.inRun) return;
+      if(!state.inRun){
+        state.animFrameId = 0;
+        return;
+      }
       const gr = gridRect();
       const dt = Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016);
       state.lastAnimTs = ts;
@@ -2305,7 +2318,7 @@ section[id^="tab-"].active{ display:block; }
         }
       }
       renderPets();
-      requestAnimationFrame(petsFrame);
+      state.animFrameId = requestAnimationFrame(petsFrame);
     }
 
     const TAB_IDS = ['dungeon','inventory','upgrades','skills','aether','settings'];
