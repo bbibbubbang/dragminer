@@ -710,6 +710,20 @@ section[id^="tab-"].active{ display:block; }
       return computeGridSafeMargins();
     }
 
+    function clamp(value, min, max){
+      if(value < min) return min;
+      if(value > max) return max;
+      return value;
+    }
+
+    function normalizeAngle(angle){
+      if(!Number.isFinite(angle)) return 0;
+      let a = angle;
+      while(a > Math.PI) a -= Math.PI * 2;
+      while(a <= -Math.PI) a += Math.PI * 2;
+      return a;
+    }
+
     function spawnAxisInfo(size, desiredMargin = GRID_SAFE_MARGIN){
       const actual = Math.max(0, size || 0);
       const desired = Math.max(0, Number.isFinite(desiredMargin) ? desiredMargin : GRID_SAFE_MARGIN);
@@ -2010,6 +2024,8 @@ section[id^="tab-"].active{ display:block; }
         swingOscAngle:0,
         swingOscAxisX:0,
         swingOscAxisY:0,
+        swingOscAxisAngle:0,
+        swingOscAxisVel:0,
         swingOscDuration:PET.atkInterval,
         swingOscAmplitudeForward:PET.swingRadius,
         swingOscAmplitudeBack:PET.swingRadius*0.6,
@@ -2147,6 +2163,8 @@ section[id^="tab-"].active{ display:block; }
       p.orbitAngularSpeed = linearOrbitSpeed / Math.max(ORE_RADIUS + 8, p.orbitRadius);
       p.swingOscAxisX = axisX;
       p.swingOscAxisY = axisY;
+      p.swingOscAxisAngle = Math.atan2(p.y - ore.y, p.x - ore.x);
+      p.swingOscAxisVel = 0;
       p.swingOscDuration = Math.max(0.45, PET.atkInterval * 0.85);
       const forwardAmp = Math.min(baseOrbitRadius * 0.45, PET.swingRadius * 0.55);
       const backAmp = Math.min(baseOrbitRadius * 0.3, PET.swingRadius * 0.4);
@@ -2219,6 +2237,11 @@ section[id^="tab-"].active{ display:block; }
             const linearOrbitSpeed = PET.moveSpeed * 0.9;
             p.orbitAngularSpeed = linearOrbitSpeed / Math.max(ORE_RADIUS + 8, p.orbitRadius);
           }
+          const alignAngle = Math.atan2(p.y - ore.y, p.x - ore.x);
+          p.swingOscAxisAngle = normalizeAngle(alignAngle);
+          p.swingOscAxisX = Math.cos(p.swingOscAxisAngle);
+          p.swingOscAxisY = Math.sin(p.swingOscAxisAngle);
+          p.swingOscAxisVel = 0;
         }
         return false;
       }
@@ -2232,18 +2255,6 @@ section[id^="tab-"].active{ display:block; }
       p.swingOscTimer = (p.swingOscTimer || 0) + dt;
       let radiusBase = newRadius;
       let axialOffset = 0;
-      let axisX = Number.isFinite(p.swingOscAxisX) ? p.swingOscAxisX : 0;
-      let axisY = Number.isFinite(p.swingOscAxisY) ? p.swingOscAxisY : 0;
-      if(Math.abs(axisX) + Math.abs(axisY) < 1e-4){
-        const relX = (p.x - ore.x);
-        const relY = (p.y - ore.y);
-        const relMag = Math.hypot(relX, relY) || 1;
-        axisX = relX / relMag;
-        axisY = relY / relMag;
-      }
-      const axisMag = Math.hypot(axisX, axisY) || 1;
-      axisX /= axisMag;
-      axisY /= axisMag;
       if(oscDuration > 0.05){
         const cycle = (p.swingOscTimer % oscDuration) / oscDuration;
         const oscValue = Math.sin(cycle * Math.PI * 2);
@@ -2270,6 +2281,23 @@ section[id^="tab-"].active{ display:block; }
       const baseAngle = Number.isFinite(p.orbitAngle) ? p.orbitAngle : Math.atan2(p.y - ore.y, p.x - ore.x);
       const nextAngle = baseAngle + dir * angularSpeed * dt;
       p.orbitAngle = nextAngle;
+      const desiredAxisAngle = normalizeAngle(nextAngle);
+      let axisAngle = Number.isFinite(p.swingOscAxisAngle) ? p.swingOscAxisAngle : desiredAxisAngle;
+      let axisVel = Number.isFinite(p.swingOscAxisVel) ? p.swingOscAxisVel : 0;
+      const angleDiff = normalizeAngle(desiredAxisAngle - axisAngle);
+      const followGain = 9;
+      axisVel += angleDiff * followGain * dt;
+      const damping = clamp(1 - dt * 4.2, 0.15, 1);
+      axisVel *= damping;
+      const maxVel = (angularSpeed * 1.4) + 1.5;
+      axisVel = clamp(axisVel, -maxVel, maxVel);
+      axisAngle = normalizeAngle(axisAngle + axisVel * dt);
+      const axisX = Math.cos(axisAngle);
+      const axisY = Math.sin(axisAngle);
+      p.swingOscAxisAngle = axisAngle;
+      p.swingOscAxisVel = axisVel;
+      p.swingOscAxisX = axisX;
+      p.swingOscAxisY = axisY;
       const prevX = p.x;
       const prevY = p.y;
       const circleX = ore.x + Math.cos(nextAngle) * radiusBase;
