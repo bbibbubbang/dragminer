@@ -872,20 +872,16 @@ section[id^="tab-"].active{ display:block; }
       const oreInfo = ORE_BY_KEY.get(key);
       const passiveMul = 1 + (state.passive.sellBonus||0);
       let sold = state.oreSales[key]||0;
-      let level = oreLevel(key);
+      let level = sold * 10;
       const prevLevel = level;
       let remaining = amount;
       let gold = 0;
       while(remaining>0){
-        const nextThreshold = (Math.floor(sold/10)+1)*10;
-        const batch = Math.min(remaining, Math.max(1, nextThreshold - sold));
         const lvlMul = levelMultiplier(level);
-        gold += batch * baseValue * lvlMul * passiveMul;
-        sold += batch;
-        remaining -= batch;
-        if(sold % 10 === 0){
-          level += 1;
-        }
+        gold += baseValue * lvlMul * passiveMul;
+        sold += 1;
+        remaining -= 1;
+        level = sold * 10;
       }
       state.oreSales[key] = sold;
       state.upgrades.oreMul[key] = level;
