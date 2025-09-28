@@ -1995,6 +1995,7 @@ section[id^="tab-"].active{ display:block; }
         swingTime:0,
         swingBaseAngle:0,
         swingDir:1,
+        swingTurnDir:0,
         swingArc:PET.swingArc,
         swingRadius:PET.swingRadius,
         swingDuration:PET.atkInterval,
@@ -2037,6 +2038,7 @@ section[id^="tab-"].active{ display:block; }
         orbitRadius:PET.swingRadius,
         orbitAngle:0,
         orbitAngularSpeed:0,
+        orbitOffset:0,
         strafeDir:0,
         strafeTimer:0,
         engageState:'idle',
@@ -2141,9 +2143,12 @@ section[id^="tab-"].active{ display:block; }
       }
       const axisX = Math.cos(approachAngle);
       const axisY = Math.sin(approachAngle);
-      const travelForward = Math.min(PET.swingRadius * 1.6, dist + Math.max(18, approachMag * 0.9));
-      const chargeEndX = ore.x + axisX * travelForward;
-      const chargeEndY = ore.y + axisY * travelForward;
+      const minOrbitRadius = ORE_RADIUS + 12;
+      const approachBoost = Math.max(12, approachMag * 0.25);
+      const desiredRadius = dist + approachBoost;
+      const baseOrbitRadius = Math.max(minOrbitRadius, Math.min(minOrbitRadius + 18, desiredRadius));
+      const chargeEndX = ore.x - axisX * baseOrbitRadius;
+      const chargeEndY = ore.y - axisY * baseOrbitRadius;
       p.swinging = true;
       p.swingStage = reuseCycle ? 'combo' : 'charge';
       p.swingTime = 0;
@@ -2153,17 +2158,21 @@ section[id^="tab-"].active{ display:block; }
       p.swingChargeStartY = p.y;
       p.swingChargeEndX = chargeEndX;
       p.swingChargeEndY = chargeEndY;
-      if(!reuseCycle || !Number.isFinite(p.orbitDir) || p.orbitDir === 0){
-        p.orbitDir = Math.random() < 0.5 ? -1 : 1;
-      }
-      const baseOrbitRadius = Math.max(ORE_RADIUS + 12, Math.min(PET.swingRadius, travelForward * 0.6));
+      const swingDir = (Number.isFinite(p.swingTurnDir) && p.swingTurnDir !== 0)
+        ? (p.swingTurnDir < 0 ? -1 : 1)
+        : (Math.random() < 0.5 ? -1 : 1);
+      p.swingTurnDir = swingDir;
+      p.orbitDir = swingDir;
       p.orbitRadius = baseOrbitRadius;
-      p.orbitAngle = Math.atan2(p.y - ore.y, p.x - ore.x);
+      const baseAngle = normalizeAngle(approachAngle + Math.PI);
+      p.swingBaseAngle = baseAngle;
+      p.orbitAngle = baseAngle;
+      p.orbitOffset = 0;
       const linearOrbitSpeed = PET.moveSpeed * 0.9;
       p.orbitAngularSpeed = linearOrbitSpeed / Math.max(ORE_RADIUS + 8, p.orbitRadius);
-      p.swingOscAxisX = axisX;
-      p.swingOscAxisY = axisY;
-      p.swingOscAxisAngle = Math.atan2(p.y - ore.y, p.x - ore.x);
+      p.swingOscAxisX = Math.cos(baseAngle);
+      p.swingOscAxisY = Math.sin(baseAngle);
+      p.swingOscAxisAngle = baseAngle;
       p.swingOscAxisVel = 0;
       p.swingOscDuration = Math.max(0.45, PET.atkInterval * 0.85);
       const forwardAmp = Math.min(baseOrbitRadius * 0.45, PET.swingRadius * 0.55);
@@ -2240,19 +2249,52 @@ section[id^="tab-"].active{ display:block; }
           const radiusNow = Math.hypot(relX, relY);
           const desiredRadius = Math.max(ORE_RADIUS + 12, Number.isFinite(p.orbitRadius) ? p.orbitRadius : PET.swingRadius * 0.9);
           p.orbitRadius = Number.isFinite(radiusNow) && radiusNow > 0 ? Math.max(ORE_RADIUS + 12, Math.min(desiredRadius, radiusNow)) : desiredRadius;
-          const alignAngle = Math.atan2(p.y - ore.y, p.x - ore.x);
-          p.swingOscAxisAngle = normalizeAngle(alignAngle);
-          p.swingOscAxisX = Math.cos(p.swingOscAxisAngle);
-          p.swingOscAxisY = Math.sin(p.swingOscAxisAngle);
+          const alignAngle = normalizeAngle(Math.atan2(p.y - ore.y, p.x - ore.x));
+          p.swingBaseAngle = alignAngle;
+          p.orbitAngle = alignAngle;
+          p.orbitOffset = 0;
+          p.swingTurnDir = (Number.isFinite(p.swingTurnDir) && p.swingTurnDir !== 0) ? (p.swingTurnDir < 0 ? -1 : 1) : 1;
+          p.orbitDir = p.swingTurnDir;
+          p.swingOscAxisAngle = alignAngle;
+          p.swingOscAxisX = Math.cos(alignAngle);
+          p.swingOscAxisY = Math.sin(alignAngle);
           p.swingOscAxisVel = 0;
         }
         return false;
       }
-      const orbitDir = Number.isFinite(p.orbitDir) && p.orbitDir < 0 ? -1 : 1;
-      const baseRadius = Number.isFinite(p.orbitRadius) ? Math.max(ORE_RADIUS + 12, p.orbitRadius) : PET.swingRadius * 0.9;
+      const baseRadius = Math.max(ORE_RADIUS + 12, Number.isFinite(p.orbitRadius) ? p.orbitRadius : PET.swingRadius * 0.9);
       const angularSpeed = Math.max(0, Number.isFinite(p.orbitAngularSpeed) ? p.orbitAngularSpeed : (PET.moveSpeed * 0.9) / Math.max(ORE_RADIUS + 8, baseRadius));
-      let orbitAngle = Number.isFinite(p.orbitAngle) ? p.orbitAngle : Math.atan2(p.y - ore.y, p.x - ore.x);
-      orbitAngle = normalizeAngle(orbitAngle + angularSpeed * dt * orbitDir);
+      const swingArc = Number.isFinite(p.swingArc) ? p.swingArc : PET.swingArc;
+      const halfArc = Math.max(0.15, swingArc * 0.5);
+      let baseAngleTarget = null;
+      if(Number.isFinite(p.swingChargeEndX) && Number.isFinite(p.swingChargeEndY)){
+        baseAngleTarget = Math.atan2(p.swingChargeEndY - ore.y, p.swingChargeEndX - ore.x);
+      }
+      if(!Number.isFinite(baseAngleTarget)){
+        baseAngleTarget = Number.isFinite(p.swingBaseAngle) ? p.swingBaseAngle : Math.atan2(p.y - ore.y, p.x - ore.x);
+      }
+      baseAngleTarget = normalizeAngle(baseAngleTarget);
+      let baseAngle = baseAngleTarget;
+      if(Number.isFinite(p.swingBaseAngle)){
+        const diff = normalizeAngle(baseAngleTarget - p.swingBaseAngle);
+        const adjust = Math.min(1, dt * 4);
+        baseAngle = normalizeAngle(p.swingBaseAngle + diff * adjust);
+      }
+      let turnDir = Number.isFinite(p.swingTurnDir) && p.swingTurnDir < 0 ? -1 : 1;
+      let offset = Number.isFinite(p.orbitOffset) ? p.orbitOffset : 0;
+      offset += angularSpeed * dt * turnDir;
+      if(offset > halfArc){
+        offset = halfArc;
+        turnDir = -1;
+      } else if(offset < -halfArc){
+        offset = -halfArc;
+        turnDir = 1;
+      }
+      p.swingTurnDir = turnDir;
+      p.orbitDir = turnDir;
+      p.orbitOffset = offset;
+      const orbitAngle = normalizeAngle(baseAngle + offset);
+      p.swingBaseAngle = baseAngle;
       p.orbitAngle = orbitAngle;
       const axisX = Math.cos(orbitAngle);
       const axisY = Math.sin(orbitAngle);
