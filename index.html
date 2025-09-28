@@ -74,6 +74,9 @@
     .ae-card{background:#0f1430;border:1px solid #53338f;border-radius:12px;padding:10px}
     .ae-card h4{margin:0 0 6px 0}
     .ae-meta{color:#c4b5fd}
+    .ae-balance{display:flex;align-items:center;gap:6px}
+    .ae-gain{font-weight:800;color:#93c5fd;opacity:0;transition:opacity .2s ease}
+    .ae-gain.show{opacity:1}
 
     footer{padding:8px 0}
     #ad-container{min-height:90px;display:flex;justify-content:center;align-items:center;width:100%}
@@ -172,7 +175,7 @@ section[id^="tab-"].active{ display:block; }
 
       <section id="tab-aether" class="panel" >
         <div class="row" style="justify-content:space-between">
-          <div class="mono">에테르: <b id="aeBalance">0</b></div>
+          <div class="mono ae-balance">에테르: <b id="aeBalance">0</b><span id="aeGainFlash" class="ae-gain"></span></div>
           <div class="mono">환생: <b id="rebirths">0회</b></div>
         </div>
         <div class="ae-card">
@@ -185,16 +188,16 @@ section[id^="tab-"].active{ display:block; }
           </div>
         </div>
         <div class="ae-card">
-          <h4>자동 이동</h4>
+          <h4>자동 도전</h4>
           <div class="row" style="justify-content:space-between;flex-wrap:wrap">
-            <div class="ae-meta">보스(에테르) 처치 시 다음 층으로 자동 입장</div>
+            <div class="ae-meta">던전 종료 시 자동으로 다시 도전합니다.</div>
             <div class="row">
-              <input type="checkbox" id="autoAdvanceChk" style="width:18px;height:18px" disabled>
-              <label for="autoAdvanceChk" class="mono" style="margin-left:6px">활성화</label>
+              <input type="checkbox" id="autoChallengeChk" style="width:18px;height:18px" disabled>
+              <label for="autoChallengeChk" class="mono" style="margin-left:6px">활성화</label>
             </div>
           </div>
           <div class="row" style="margin-top:8px">
-            <button id="autoAdvanceBuyBtn" class="btn" disabled>에테르 150 소모 후 해금</button>
+            <button id="autoChallengeBuyBtn" class="btn" disabled>에테르 300 소모 후 해금</button>
           </div>
         </div>
       </section>
@@ -455,7 +458,7 @@ section[id^="tab-"].active{ display:block; }
         defaults.oreMul = {};
         return defaults;
       })(),
-      aether: { luck:0, petPlus:0, etherHaste:0, rebirths:0, autoAdvanceOwned:false, autoAdvanceEnabled:false },
+      aether: { luck:0, petPlus:0, etherHaste:0, rebirths:0, autoChallengeOwned:false, autoChallengeEnabled:false },
 
       floor: 1,
       highestFloor: 1,
@@ -489,6 +492,8 @@ section[id^="tab-"].active{ display:block; }
       // Settings
       settings: { autoSell:false }
     };
+
+    const AUTO_CHALLENGE_COST = 300;
 
     function ensurePassiveDefaults(){
       state.passive = state.passive || {};
@@ -550,6 +555,16 @@ section[id^="tab-"].active{ display:block; }
         state.skillSlots=s.skillSlots||[null,null,null,null,null];
         state.passive=s.passive||state.passive;
         state.aether = s.aether || state.aether;
+        if(state.aether){
+          if(typeof state.aether.autoChallengeOwned !== 'boolean'){
+            state.aether.autoChallengeOwned = !!state.aether.autoAdvanceOwned;
+          }
+          if(typeof state.aether.autoChallengeEnabled !== 'boolean'){
+            state.aether.autoChallengeEnabled = !!state.aether.autoAdvanceEnabled;
+          }
+          delete state.aether.autoAdvanceOwned;
+          delete state.aether.autoAdvanceEnabled;
+        }
         state.settings = s.settings || state.settings;
         ensurePassiveDefaults();
         resetRunFlags();
@@ -601,6 +616,8 @@ section[id^="tab-"].active{ display:block; }
     const gridEl = $('#grid');
     const skillBarEl = $('#skillBar');
     const screenEl = $('.screen');
+    const aeGainFlashEl = $('#aeGainFlash');
+    let aeGainFlashTimer = null;
     let gridRectCache = null;
     let lastGridRectValid = null;
 
@@ -940,7 +957,6 @@ section[id^="tab-"].active{ display:block; }
       const oreInfo = ORE_BY_KEY.get(key);
       const passiveMul = 1 + (state.passive.sellBonus||0);
       let sold = state.oreSales[key]||0;
-      const prevLevel = Math.max(0, Math.floor(sold / 10));
       let remaining = amount;
       let gold = 0;
       while(remaining>0){
@@ -953,10 +969,6 @@ section[id^="tab-"].active{ display:block; }
       state.oreSales[key] = sold;
       const level = Math.max(0, Math.floor(sold / 10));
       state.upgrades.oreMul[key] = level;
-      if(level !== prevLevel){
-        const oreName = oreInfo?.name || key;
-        toast(`${oreName} 레벨 ${level}`);
-      }
       return Math.round(gold);
     }
 
@@ -1172,11 +1184,12 @@ section[id^="tab-"].active{ display:block; }
       $('#aeBalance').textContent = state.player.ether;
       $('#rebirths').textContent = (state.aether?.rebirths||0)+'회';
       const canRebirth = state.highestFloor >= 20;
-      const ownAA = !!state.aether.autoAdvanceOwned;
-      $('#autoAdvanceBuyBtn').disabled = ownAA || !canRebirth || state.player.ether < 150;
-      $('#autoAdvanceBuyBtn').textContent = ownAA ? '해금됨' : '에테르 150 소모 후 해금';
-      $('#autoAdvanceChk').disabled = !ownAA;
-      $('#autoAdvanceChk').checked = !!state.aether.autoAdvanceEnabled;
+      const autoCost = AUTO_CHALLENGE_COST;
+      const ownAuto = !!state.aether.autoChallengeOwned;
+      $('#autoChallengeBuyBtn').disabled = ownAuto || !canRebirth || state.player.ether < autoCost;
+      $('#autoChallengeBuyBtn').textContent = ownAuto ? '해금됨' : `에테르 ${autoCost} 소모 후 해금`;
+      $('#autoChallengeChk').disabled = !ownAuto;
+      $('#autoChallengeChk').checked = !!state.aether.autoChallengeEnabled;
 
       const list = $('#rebirthPerks'); list.innerHTML='';
       let total = 0;
@@ -1208,6 +1221,23 @@ section[id^="tab-"].active{ display:block; }
       $('#rebirthTotal').textContent = total;
       const afford = state.player.ether >= total;
       $('#rebirthBuyBtn').disabled = !(canRebirth && afford && total>0);
+    }
+
+    function flashAetherGain(amount){
+      if(!aeGainFlashEl) return;
+      if(typeof amount !== 'number' || !Number.isFinite(amount)) return;
+      if(aeGainFlashTimer){
+        clearTimeout(aeGainFlashTimer);
+        aeGainFlashTimer = null;
+      }
+      const formatted = amount > 0 ? `+${amount}` : `${amount}`;
+      aeGainFlashEl.textContent = formatted;
+      aeGainFlashEl.classList.add('show');
+      aeGainFlashTimer = setTimeout(()=>{
+        aeGainFlashEl.classList.remove('show');
+        aeGainFlashEl.textContent = '';
+        aeGainFlashTimer = null;
+      }, 3000);
     }
 
     function syncSkillSlotsWithOwned(){
@@ -1523,7 +1553,7 @@ section[id^="tab-"].active{ display:block; }
       renderSkillBar();
       gridRectCache = null;
       refresh();
-      if(cleared && state.aether?.autoAdvanceOwned && state.aether.autoAdvanceEnabled){
+      if(state.aether?.autoChallengeOwned && state.aether.autoChallengeEnabled){
         setTimeout(()=>{ startRun(); }, 250);
       }
     }
@@ -1610,7 +1640,14 @@ section[id^="tab-"].active{ display:block; }
         state.grid[idx] = ore; renderGrid(); }
 
     function onOreBroken(idx, ore){
-      if(ore.type==='EtherOre'){ state.player.ether += 10; toast('✨ 에테르 +10'); state.grid[idx] = null; SFX.break(); bankAndExit(true); return; }
+      if(ore.type==='EtherOre'){
+        state.player.ether += 10;
+        flashAetherGain(10);
+        state.grid[idx] = null;
+        SFX.break();
+        bankAndExit(true);
+        return;
+      }
       state.loot[ore.type] = (state.loot[ore.type]||0)+1;
       state.grid[idx] = null;
       state.timeLeft = Math.min(20, +(state.timeLeft + 0.1).toFixed(1));
@@ -2079,18 +2116,19 @@ section[id^="tab-"].active{ display:block; }
       i.click();
     });
 
-    document.getElementById('autoAdvanceBuyBtn').addEventListener('click', ()=>{
-      if(state.aether.autoAdvanceOwned) return;
+    document.getElementById('autoChallengeBuyBtn').addEventListener('click', ()=>{
+      if(state.aether.autoChallengeOwned) return;
       if(state.highestFloor < 20) return toast('지하 20층 이상에서 해금 가능합니다.');
-      if(state.player.ether < 150) return toast('에테르 부족');
-      state.player.ether -= 150;
-      state.aether.autoAdvanceOwned = true;
-      state.aether.autoAdvanceEnabled = true;
-      save(); renderAether(); renderTop(); toast('자동 이동 해금!');
+      const cost = AUTO_CHALLENGE_COST;
+      if(state.player.ether < cost) return toast('에테르 부족');
+      state.player.ether -= cost;
+      state.aether.autoChallengeOwned = true;
+      state.aether.autoChallengeEnabled = true;
+      save(); renderAether(); renderTop(); toast('자동 도전 해금!');
     });
-    document.getElementById('autoAdvanceChk').addEventListener('change', (e)=>{
-      if(!state.aether.autoAdvanceOwned){ e.target.checked=false; return; }
-      state.aether.autoAdvanceEnabled = e.target.checked; save();
+    document.getElementById('autoChallengeChk').addEventListener('change', (e)=>{
+      if(!state.aether.autoChallengeOwned){ e.target.checked=false; return; }
+      state.aether.autoChallengeEnabled = e.target.checked; save();
     });
     document.getElementById('rebirthBuyBtn').addEventListener('click', ()=>{
       if(state.highestFloor < 20) return;
