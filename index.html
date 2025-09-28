@@ -519,6 +519,7 @@ section[id^="tab-"].active{ display:block; }
     const skillBarEl = $('#skillBar');
     const screenEl = $('.screen');
     let gridRectCache = null;
+    let lastGridRectValid = null;
 
     const ORE_SIZE = 52;
     const ORE_RADIUS = ORE_SIZE / 2;
@@ -744,7 +745,8 @@ section[id^="tab-"].active{ display:block; }
     }
     function gridRect(){
       const r = gridEl.getBoundingClientRect();
-      if(r.width && r.height){
+      const hasSize = (r.width || 0) > 0 && (r.height || 0) > 0;
+      if(hasSize){
         if(gridRectCache){
           const widthChanged = Math.abs(gridRectCache.width - r.width) > 0.5;
           const heightChanged = Math.abs(gridRectCache.height - r.height) > 0.5;
@@ -777,11 +779,17 @@ section[id^="tab-"].active{ display:block; }
           }
         }
         gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
-      } else if(!gridRectCache){
-        gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
-      } else {
-        gridRectCache = {left:r.left, top:r.top, width:gridRectCache.width, height:gridRectCache.height, right:r.left + gridRectCache.width, bottom:r.top + gridRectCache.height};
+        lastGridRectValid = gridRectCache;
+        return gridRectCache;
       }
+      if(lastGridRectValid){
+        gridRectCache = lastGridRectValid;
+        return gridRectCache;
+      }
+      if(gridRectCache){
+        return gridRectCache;
+      }
+      gridRectCache = {left:r.left, top:r.top, width:ORE_SIZE, height:ORE_SIZE, right:r.left + ORE_SIZE, bottom:r.top + ORE_SIZE};
       return gridRectCache;
     }
     function cellCenter(idx){ const o = state.grid[idx]; return { x:o.x, y:o.y }; }
