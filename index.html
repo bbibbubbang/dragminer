@@ -2014,6 +2014,7 @@ section[id^="tab-"].active{ display:block; }
         swingOscAmplitudeForward:PET.swingRadius,
         swingOscAmplitudeBack:PET.swingRadius*0.6,
         swingOscTurnDir:1,
+        swingOscTimer:0,
         swingLastOffset:0,
         swingCooldownTimer:0,
         orbitDir:0,
@@ -2130,6 +2131,7 @@ section[id^="tab-"].active{ display:block; }
       p.swinging = true;
       p.swingStage = reuseCycle ? 'orbit' : 'charge';
       p.swingTime = 0;
+      p.swingOscTimer = reuseCycle ? (p.swingOscTimer || 0) : 0;
       p.swingChargeDuration = Math.max(0.08, PET.atkInterval * 0.35);
       p.swingChargeStartX = p.x;
       p.swingChargeStartY = p.y;
@@ -2143,6 +2145,13 @@ section[id^="tab-"].active{ display:block; }
       p.orbitAngle = Math.atan2(p.y - ore.y, p.x - ore.x);
       const linearOrbitSpeed = PET.moveSpeed * 0.9;
       p.orbitAngularSpeed = linearOrbitSpeed / Math.max(ORE_RADIUS + 8, p.orbitRadius);
+      p.swingOscAxisX = axisX;
+      p.swingOscAxisY = axisY;
+      p.swingOscDuration = Math.max(0.45, PET.atkInterval * 0.85);
+      const forwardAmp = Math.min(baseOrbitRadius * 0.45, PET.swingRadius * 0.55);
+      const backAmp = Math.min(baseOrbitRadius * 0.3, PET.swingRadius * 0.4);
+      p.swingOscAmplitudeForward = forwardAmp;
+      p.swingOscAmplitudeBack = backAmp;
       p.swingCooldownTimer = 0;
       p.swingLastOffset = 0;
       p.swingInitialDamageDone = !immediateStrike;
@@ -2219,18 +2228,38 @@ section[id^="tab-"].active{ display:block; }
       const radiusLerp = Math.min(1, dt * 6);
       const currentRadius = Math.hypot(p.x - ore.x, p.y - ore.y) || targetRadius;
       const newRadius = currentRadius + (targetRadius - currentRadius) * radiusLerp;
-      p.orbitRadius = newRadius;
+      const oscDuration = Math.max(0.1, Number.isFinite(p.swingOscDuration) ? p.swingOscDuration : PET.atkInterval);
+      p.swingOscTimer = (p.swingOscTimer || 0) + dt;
+      let radiusWithOsc = newRadius;
+      if(oscDuration > 0.05){
+        const cycle = (p.swingOscTimer % oscDuration) / oscDuration;
+        const oscValue = Math.sin(cycle * Math.PI * 2);
+        const forwardAmp = Number.isFinite(p.swingOscAmplitudeForward) ? p.swingOscAmplitudeForward : newRadius * 0.25;
+        const backAmp = Number.isFinite(p.swingOscAmplitudeBack) ? p.swingOscAmplitudeBack : newRadius * 0.18;
+        if(oscValue >= 0){
+          radiusWithOsc = newRadius - Math.abs(oscValue) * forwardAmp;
+        } else {
+          radiusWithOsc = newRadius + Math.abs(oscValue) * backAmp;
+        }
+        const minRadius = ORE_RADIUS + 8;
+        const maxRadius = Math.max(minRadius, PET.swingRadius * 1.4);
+        radiusWithOsc = Math.max(minRadius, Math.min(maxRadius, radiusWithOsc));
+        p.swingLastOffset = radiusWithOsc - newRadius;
+      } else {
+        p.swingLastOffset = 0;
+      }
+      p.orbitRadius = radiusWithOsc;
       const angularSpeed = (Number.isFinite(p.orbitAngularSpeed) && p.orbitAngularSpeed > 0)
         ? p.orbitAngularSpeed
-        : linearOrbitSpeed / Math.max(ORE_RADIUS + 8, newRadius);
+        : linearOrbitSpeed / Math.max(ORE_RADIUS + 8, radiusWithOsc);
       p.orbitAngularSpeed = angularSpeed;
       const baseAngle = Number.isFinite(p.orbitAngle) ? p.orbitAngle : Math.atan2(p.y - ore.y, p.x - ore.x);
       const nextAngle = baseAngle + dir * angularSpeed * dt;
       p.orbitAngle = nextAngle;
       const prevX = p.x;
       const prevY = p.y;
-      p.x = ore.x + Math.cos(nextAngle) * newRadius;
-      p.y = ore.y + Math.sin(nextAngle) * newRadius;
+      p.x = ore.x + Math.cos(nextAngle) * radiusWithOsc;
+      p.y = ore.y + Math.sin(nextAngle) * radiusWithOsc;
       const dtSafe = Math.max(dt, 0.016);
       p.vx = (p.x - prevX) / dtSafe;
       p.vy = (p.y - prevY) / dtSafe;
