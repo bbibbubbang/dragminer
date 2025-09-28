@@ -1334,10 +1334,10 @@ section[id^="tab-"].active{ display:block; }
     function floorHpMul(){ return 1 + 0.18*(state.floor-1); }
     function floorValMul(){ return 1 + 0.12*(state.floor-1); }
     function etherHpForFloor(){
-      const baseHp = 2000;
-      const perFloor = 650;
+      const baseHp = 500;
       const floorOffset = Math.max(0, state.floor - 1);
-      return Math.round(baseHp + perFloor * floorOffset);
+      const scale = Math.pow(1.1, floorOffset);
+      return Math.round(baseHp * scale);
     }
 
     function startRun(){
