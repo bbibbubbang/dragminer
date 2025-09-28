@@ -609,12 +609,16 @@ section[id^="tab-"].active{ display:block; }
       if(!ore) return;
       ore.x = clampAxisValue(ore.x, axisX);
       ore.y = clampAxisValue(ore.y, axisY);
-      const gridWidth = axisX?.size ?? gridRectCache?.width ?? gridRect().width ?? ORE_SIZE;
-      const gridHeight = axisY?.size ?? gridRectCache?.height ?? gridRect().height ?? ORE_SIZE;
-      const minCenterX = ORE_RADIUS;
-      const maxCenterX = Math.max(minCenterX, gridWidth - ORE_RADIUS);
-      const minCenterY = ORE_RADIUS;
-      const maxCenterY = Math.max(minCenterY, gridHeight - ORE_RADIUS);
+      const gridWidth = axisX?.size ?? gridRectCache?.width ?? lastGridRectValid?.width ?? ORE_SIZE;
+      const gridHeight = axisY?.size ?? gridRectCache?.height ?? lastGridRectValid?.height ?? ORE_SIZE;
+      const availableX = Math.max(0, gridWidth - ORE_SIZE);
+      const availableY = Math.max(0, gridHeight - ORE_SIZE);
+      const marginX = Math.min(GRID_SAFE_MARGIN, availableX / 2);
+      const marginY = Math.min(GRID_SAFE_MARGIN, availableY / 2);
+      const minCenterX = ORE_RADIUS + marginX;
+      const maxCenterX = Math.max(minCenterX, gridWidth - (ORE_RADIUS + marginX));
+      const minCenterY = ORE_RADIUS + marginY;
+      const maxCenterY = Math.max(minCenterY, gridHeight - (ORE_RADIUS + marginY));
       ore.x = Math.min(Math.max(ore.x, minCenterX), maxCenterX);
       ore.y = Math.min(Math.max(ore.y, minCenterY), maxCenterY);
     }
@@ -1548,22 +1552,32 @@ section[id^="tab-"].active{ display:block; }
       }
       return best;
     }
-    function choosePetTarget(p, oreIndices){
+    function choosePetTarget(p, oreIndices, claimCounts){
       if(!oreIndices.length) return -1;
       const multiPets = state.pets.length >= 2;
       const multiOres = oreIndices.length >= 2;
       if(!(multiPets && multiOres)){
         return findNearestOreFromList(p.x, p.y, oreIndices);
       }
-      const targetedByOthers = new Set();
-      for(const other of state.pets){
-        if(other === p) continue;
-        const idx = other.targetIdx;
-        if(idx>=0 && state.grid[idx]) targetedByOthers.add(idx);
+      let bestIdx = -1;
+      let bestCount = Infinity;
+      let bestDist = Infinity;
+      const counts = claimCounts || new Map();
+      for(const idx of oreIndices){
+        const ore = state.grid[idx];
+        if(!ore) continue;
+        const count = counts.get(idx) || 0;
+        const dx = ore.x - p.x;
+        const dy = ore.y - p.y;
+        const distSq = dx*dx + dy*dy;
+        if(count < bestCount || (count === bestCount && distSq < bestDist)){
+          bestCount = count;
+          bestDist = distSq;
+          bestIdx = idx;
+        }
       }
-      const untargeted = oreIndices.filter(idx => !targetedByOthers.has(idx));
-      if(untargeted.length){
-        return findNearestOreFromList(p.x, p.y, untargeted);
+      if(bestIdx !== -1){
+        return bestIdx;
       }
       return findNearestOreFromList(p.x, p.y, oreIndices);
     }
@@ -1697,31 +1711,47 @@ section[id^="tab-"].active{ display:block; }
       }
       const multiPets = state.pets.length >= 2;
       const multiOres = oreIndices.length >= 2;
+      const oreTargetClaims = new Map();
+      for(const p of state.pets){
+        if(p.targetIdx>=0 && state.grid[p.targetIdx]){
+          oreTargetClaims.set(p.targetIdx, (oreTargetClaims.get(p.targetIdx)||0)+1);
+        } else if(p.targetIdx !== -1){
+          p.targetIdx = -1;
+        }
+      }
       for(const p of state.pets){
         if(p.swinging){
           const ore = state.grid[p.targetIdx];
           if(!ore){
+            if(p.targetIdx>=0){
+              const prevCount = oreTargetClaims.get(p.targetIdx) || 0;
+              if(prevCount <= 1){
+                oreTargetClaims.delete(p.targetIdx);
+              } else {
+                oreTargetClaims.set(p.targetIdx, prevCount - 1);
+              }
+            }
             p.swinging=false;
             p.targetIdx=-1;
           }
           continue;
         }
-        if(p.targetIdx<0 || !state.grid[p.targetIdx]){
-          p.targetIdx = choosePetTarget(p, oreIndices);
-        } else if(multiPets && multiOres){
-          let shared = false;
-          for(const other of state.pets){
-            if(other === p) continue;
-            if(other.targetIdx === p.targetIdx && state.grid[p.targetIdx]){
-              shared = true;
-              break;
+        const hasTarget = p.targetIdx>=0 && state.grid[p.targetIdx];
+        const targetCount = hasTarget ? (oreTargetClaims.get(p.targetIdx)||0) : 0;
+        const needsRetarget = !hasTarget || (multiPets && multiOres && targetCount > 1);
+        if(needsRetarget){
+          if(hasTarget){
+            const prevCount = oreTargetClaims.get(p.targetIdx) || 0;
+            if(prevCount <= 1){
+              oreTargetClaims.delete(p.targetIdx);
+            } else {
+              oreTargetClaims.set(p.targetIdx, prevCount - 1);
             }
           }
-          if(shared){
-            const newIdx = choosePetTarget(p, oreIndices);
-            if(newIdx !== -1 && newIdx !== p.targetIdx){
-              p.targetIdx = newIdx;
-            }
+          const newIdx = choosePetTarget(p, oreIndices, oreTargetClaims);
+          p.targetIdx = newIdx;
+          if(newIdx >= 0){
+            oreTargetClaims.set(newIdx, (oreTargetClaims.get(newIdx)||0)+1);
           }
         }
         const ore = p.targetIdx>=0 ? state.grid[p.targetIdx] : null;
