@@ -1567,30 +1567,38 @@ section[id^="tab-"].active{ display:block; }
       }
       return findNearestOreFromList(p.x, p.y, oreIndices);
     }
-    function configurePetSwing(p, ore, reuseCycle=false){
+    function configurePetSwing(p, ore, reuseCycle=false, approachVX=0, approachVY=0, immediateStrike=false){
       if(!ore) return false;
       const dx = ore.x - p.x;
       const dy = ore.y - p.y;
       const dist = Math.hypot(dx, dy) || 1;
       const towardOre = Math.atan2(dy, dx);
-      let baseAngle;
-      if(reuseCycle && Number.isFinite(p.swingBaseAngle)){
-        baseAngle = p.swingBaseAngle + Math.PI + (Math.random()*0.3 - 0.15);
-      }else{
-        baseAngle = towardOre + Math.PI/2 + (Math.random()*0.6 - 0.3);
+      const approachMag = Math.hypot(approachVX, approachVY);
+      let travelAngle;
+      if(reuseCycle && Number.isFinite(p.lastApproachAngle)){
+        travelAngle = p.lastApproachAngle + (Math.random()*0.15 - 0.075);
+      } else if(approachMag > 1){
+        travelAngle = Math.atan2(approachVY, approachVX);
+      } else if(Number.isFinite(p.lastApproachAngle)){
+        travelAngle = p.lastApproachAngle;
+      } else {
+        travelAngle = towardOre;
       }
-      const axisX = Math.cos(baseAngle);
-      const axisY = Math.sin(baseAngle);
-      const perpX = -axisY;
-      const perpY = axisX;
+      const axisX = Math.cos(travelAngle);
+      const axisY = Math.sin(travelAngle);
+      const lateralJitter = (Math.random()*0.5 - 0.25);
+      const perpAngle = travelAngle + Math.PI/2 + lateralJitter;
+      const perpX = Math.cos(perpAngle);
+      const perpY = Math.sin(perpAngle);
       const swingDir = reuseCycle && p.swingDir ? -p.swingDir : (Math.random() < 0.5 ? -1 : 1);
-      const reach = Math.max(ORE_RADIUS + 6, dist);
-      const amplitude = Math.min(reach + 12, PET.swingRadius * (0.95 + Math.random()*0.4));
-      const inertia = amplitude * (0.52 + Math.random()*0.38);
+      const reach = Math.max(ORE_RADIUS + 6, dist + Math.min(approachMag * 0.6, PET.swingRadius * 0.4));
+      const amplitude = Math.min(PET.swingRadius * (0.9 + Math.random()*0.35), reach);
+      const inertiaBase = amplitude * (0.38 + Math.random()*0.32);
+      const inertia = Math.min(PET.swingRadius * 1.25, inertiaBase + approachMag * 0.9);
       p.swinging = true;
       p.swingTime = 0;
       p.swingDir = swingDir;
-      p.swingBaseAngle = baseAngle;
+      p.swingBaseAngle = travelAngle;
       p.swingAxisX = axisX;
       p.swingAxisY = axisY;
       p.swingPerpX = perpX;
@@ -1600,20 +1608,39 @@ section[id^="tab-"].active{ display:block; }
       p.swingAmplitude = amplitude;
       p.swingInertia = inertia;
       p.swingDuration = PET.atkInterval;
-      p.swingDriftAngle = towardOre + (Math.random()*0.6 - 0.3);
+      p.swingDriftAngle = travelAngle + (Math.random()*0.6 - 0.3);
       p.swingDriftStrength = (6 + Math.random()*12) * (amplitude / PET.swingRadius);
       p.swingNoiseSeed = Math.random()*Math.PI*2;
       p.swingStartOffsetX = p.x - ore.x;
       p.swingStartOffsetY = p.y - ore.y;
+      p.swingInitialDamageDone = !immediateStrike;
+      p.lastApproachAngle = travelAngle;
+      p.lastApproachSpeed = approachMag;
+      p.lastApproachVX = approachMag > 0 ? axisX * approachMag : approachVX;
+      p.lastApproachVY = approachMag > 0 ? axisY * approachMag : approachVY;
       return true;
     }
     function startPetSwing(p, ore){
-      if(!configurePetSwing(p, ore, false)) return;
-      p.vx *= 0.4;
-      p.vy *= 0.4;
+      const approachVX = p.vx;
+      const approachVY = p.vy;
+      if(!configurePetSwing(p, ore, false, approachVX, approachVY, true)) return;
+      p.vx *= 0.35;
+      p.vy *= 0.35;
     }
     function updateSwing(p, ore, dt){
       if(!p.swinging || !ore) return false;
+      if(!p.swingInitialDamageDone){
+        p.swingInitialDamageDone = true;
+        hit(p.targetIdx,'pet');
+        const currentOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
+        if(!currentOre){
+          p.swinging = false;
+          p.swingTime = 0;
+          p.targetIdx = -1;
+          return true;
+        }
+        ore = currentOre;
+      }
       const prevX = p.x;
       const prevY = p.y;
       p.swingTime += dt;
@@ -1649,7 +1676,7 @@ section[id^="tab-"].active{ display:block; }
         hit(p.targetIdx,'pet');
         const nextOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
         if(nextOre){
-          configurePetSwing(p, nextOre, true);
+          configurePetSwing(p, nextOre, true, p.vx, p.vy, false);
         } else {
           p.swinging = false;
           p.swingTime = 0;
