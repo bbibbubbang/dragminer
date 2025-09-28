@@ -1336,7 +1336,7 @@ section[id^="tab-"].active{ display:block; }
     function etherHpForFloor(){
       const baseHp = 500;
       const floorOffset = Math.max(0, state.floor - 1);
-      const scale = Math.pow(1.1, floorOffset);
+      const scale = Math.pow(1.05, floorOffset);
       return Math.round(baseHp * scale);
     }
 
