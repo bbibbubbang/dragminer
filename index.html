@@ -2248,14 +2248,19 @@ section[id^="tab-"].active{ display:block; }
         }
         return false;
       }
-      const axisAngle = Number.isFinite(p.swingOscAxisAngle) ? p.swingOscAxisAngle : Math.atan2(ore.y - p.y, ore.x - p.x);
-      const rawAxisX = Number.isFinite(p.swingOscAxisX) ? p.swingOscAxisX : Math.cos(axisAngle);
-      const rawAxisY = Number.isFinite(p.swingOscAxisY) ? p.swingOscAxisY : Math.sin(axisAngle);
-      const axisMag = Math.hypot(rawAxisX, rawAxisY) || 1;
-      const axisX = rawAxisX / axisMag;
-      const axisY = rawAxisY / axisMag;
+      const orbitDir = Number.isFinite(p.orbitDir) && p.orbitDir < 0 ? -1 : 1;
+      const baseRadius = Number.isFinite(p.orbitRadius) ? Math.max(ORE_RADIUS + 12, p.orbitRadius) : PET.swingRadius * 0.9;
+      const angularSpeed = Math.max(0, Number.isFinite(p.orbitAngularSpeed) ? p.orbitAngularSpeed : (PET.moveSpeed * 0.9) / Math.max(ORE_RADIUS + 8, baseRadius));
+      let orbitAngle = Number.isFinite(p.orbitAngle) ? p.orbitAngle : Math.atan2(p.y - ore.y, p.x - ore.x);
+      orbitAngle = normalizeAngle(orbitAngle + angularSpeed * dt * orbitDir);
+      p.orbitAngle = orbitAngle;
+      const axisX = Math.cos(orbitAngle);
+      const axisY = Math.sin(orbitAngle);
       const perpX = -axisY;
       const perpY = axisX;
+      p.swingOscAxisAngle = orbitAngle;
+      p.swingOscAxisX = axisX;
+      p.swingOscAxisY = axisY;
       const targetRadius = Math.max(ORE_RADIUS + 12, Number.isFinite(p.orbitRadius) ? p.orbitRadius : PET.swingRadius * 0.9);
       const radiusLerp = Math.min(1, dt * 6);
       const currentBase = Number.isFinite(p.flowerBaseRadius) ? p.flowerBaseRadius : targetRadius;
