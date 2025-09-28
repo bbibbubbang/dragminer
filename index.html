@@ -2440,7 +2440,10 @@ section[id^="tab-"].active{ display:block; }
             const perpY = axisX;
             const strafeSpeed = PET.moveSpeed * 0.55;
             const radialError = dist - targetRadius;
-            const radialCorrection = Math.max(-PET.moveSpeed * 0.6, Math.min(PET.moveSpeed * 0.6, -radialError * 4));
+            const radialCorrection = Math.max(
+              -PET.moveSpeed * 0.6,
+              Math.min(PET.moveSpeed * 0.6, radialError * 4)
+            );
             const forwardOsc = Math.sin(p.strafeTimer * Math.PI * 2) * PET.moveSpeed * 0.2;
             const desiredVX = perpX * strafeSpeed * strafeDir + axisX * (forwardOsc + radialCorrection);
             const desiredVY = perpY * strafeSpeed * strafeDir + axisY * (forwardOsc + radialCorrection);
