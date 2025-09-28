@@ -50,4 +50,28 @@ window.PASSIVE_SKILL_DATA = [
       if(state.inRun && typeof spawnPets === 'function') spawnPets();
     },
   },
+  {
+    key:'berserkAuto',
+    name:'광폭화 자동 발동',
+    desc:'남은시간 5초 이하 시 광폭화 자동 발동 (토글 가능)',
+    ae:300,
+    once:true,
+    toggleKey:'berserkAutoEnabled',
+    toggleLabel:'자동 발동',
+    apply: ({ state }) => {
+      state.passive = state.passive || {};
+      state.passive.berserkAutoEnabled = true;
+    },
+  },
+  {
+    key:'berserkBoost',
+    name:'광폭화 강화',
+    desc:'남은시간 5초 이하 시 쿨타임 무시 & 무제한 지속',
+    ae:500,
+    once:true,
+    apply: ({ state }) => {
+      state.passive = state.passive || {};
+      state.passive.berserkUnlimit = true;
+    },
+  },
 ];

@@ -306,6 +306,7 @@ section[id^="tab-"].active{ display:block; }
       }
     }
     const ACTIVE_SKILLS = window.ACTIVE_SKILL_DATA;
+    const BERSERK_SKILL = ACTIVE_SKILLS.find(s=>s.key==='berserk');
     const PASSIVE_SKILLS = window.PASSIVE_SKILL_DATA;
     const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
     const UPGRADE_INFO = window.UPGRADE_INFO;
@@ -457,11 +458,30 @@ section[id^="tab-"].active{ display:block; }
       skillAtkBuffUntil: 0,
 
       // Passive bonuses
-      passive: { sellBonus: 0, petPlus: 0 },
+      passive: { sellBonus: 0, petPlus: 0, berserkAutoEnabled:false, berserkUnlimit:false },
+
+      // Run-time flags
+      runFlags: { autoBerserkUsed:false },
 
       // Settings
       settings: { autoSell:false }
     };
+
+    function ensurePassiveDefaults(){
+      state.passive = state.passive || {};
+      if(typeof state.passive.sellBonus !== 'number') state.passive.sellBonus = 0;
+      if(typeof state.passive.petPlus !== 'number') state.passive.petPlus = 0;
+      if(typeof state.passive.berserkAutoEnabled !== 'boolean') state.passive.berserkAutoEnabled = false;
+      if(typeof state.passive.berserkUnlimit !== 'boolean') state.passive.berserkUnlimit = false;
+    }
+
+    function resetRunFlags(){
+      state.runFlags = state.runFlags || {};
+      state.runFlags.autoBerserkUsed = false;
+    }
+
+    ensurePassiveDefaults();
+    resetRunFlags();
 
     // ---------- Save/Load (stable key + migration) ----------
     function save(){
@@ -508,6 +528,8 @@ section[id^="tab-"].active{ display:block; }
         state.passive=s.passive||state.passive;
         state.aether = s.aether || state.aether;
         state.settings = s.settings || state.settings;
+        ensurePassiveDefaults();
+        resetRunFlags();
         if(typeof state.player.atkBase === 'undefined'){
           state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 10;
         }
@@ -1073,6 +1095,7 @@ section[id^="tab-"].active{ display:block; }
     }
 
     function renderSkills(){
+      ensurePassiveDefaults();
       const slotsUpdated = syncSkillSlotsWithOwned();
       if(slotsUpdated){ save(); }
       const slotList = $('#slotList'); slotList.innerHTML='';
@@ -1092,14 +1115,47 @@ section[id^="tab-"].active{ display:block; }
         const owned = !!state.skillsOwnedPassive[sk.key];
         const card = document.createElement('div'); card.className = 'skill-card';
         card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">패시브</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned && sk.once?'disabled':''}>${owned?(sk.once?'보유중':'추가 구매'):'구매'}</button></div>`;
-        card.querySelector('.btn').addEventListener('click', ()=>{
-          if(!spendAe(sk.ae)) { SFX.deny(); return; }
-          if(sk.once && owned){ toast('이미 보유'); SFX.deny(); return; }
-          if(!state.skillsOwnedPassive[sk.key]) state.skillsOwnedPassive[sk.key]=0;
-          state.skillsOwnedPassive[sk.key] += 1;
-          if(typeof sk.apply === 'function'){ sk.apply({ state, spawnPets }); }
-          toast(`${sk.name} 적용!`); SFX.ui(); save(); renderSkills(); renderUpgrades(); renderTop();
-        });
+        const buyBtn = card.querySelector('.btn');
+        if(buyBtn){
+          buyBtn.addEventListener('click', ()=>{
+            if(!spendAe(sk.ae)) { SFX.deny(); return; }
+            if(sk.once && owned){ toast('이미 보유'); SFX.deny(); return; }
+            if(!state.skillsOwnedPassive[sk.key]) state.skillsOwnedPassive[sk.key]=0;
+            state.skillsOwnedPassive[sk.key] += 1;
+            if(typeof sk.apply === 'function'){ sk.apply({ state, spawnPets }); }
+            ensurePassiveDefaults();
+            toast(`${sk.name} 적용!`); SFX.ui(); save(); renderSkills(); renderUpgrades(); renderTop();
+          });
+        }
+        if(sk.toggleKey){
+          const toggleRow = document.createElement('div');
+          toggleRow.className = 'row';
+          toggleRow.style.justifyContent = 'flex-end';
+          toggleRow.style.marginTop = '8px';
+          const label = document.createElement('label');
+          label.className = 'row';
+          label.style.alignItems = 'center';
+          label.style.gap = '6px';
+          const toggle = document.createElement('input');
+          toggle.type = 'checkbox';
+          toggle.style.width = '18px';
+          toggle.style.height = '18px';
+          toggle.checked = !!state.passive[sk.toggleKey];
+          toggle.disabled = !owned;
+          toggle.addEventListener('change', ()=>{
+            if(!owned){ toggle.checked = false; return; }
+            state.passive[sk.toggleKey] = !!toggle.checked;
+            save();
+            SFX.ui();
+            toast(`${sk.name} ${toggle.checked?'ON':'OFF'}`);
+          });
+          const span = document.createElement('span');
+          span.textContent = sk.toggleLabel || 'ON/OFF';
+          label.appendChild(toggle);
+          label.appendChild(span);
+          toggleRow.appendChild(label);
+          card.appendChild(toggleRow);
+        }
         shopP.appendChild(card);
       }
       const shopA = $('#skillShopActive'); shopA.innerHTML='';
@@ -1137,12 +1193,46 @@ section[id^="tab-"].active{ display:block; }
 
     function setCd(key, sec){ state.skillCooldowns[key] = sec; }
 
+    function activateBerserk(){
+      if(!state.skillsOwnedActive?.berserk) return { success:false };
+      const unlimited = (state.timeLeft <= 5) && !!state.passive?.berserkUnlimit;
+      const currentCd = state.skillCooldowns.berserk || 0;
+      if(!unlimited && currentCd > 0) return { success:false, reason:'cooldown' };
+      state.skillAtkBuffUntil = unlimited ? Infinity : performance.now()+5000;
+      const cd = unlimited ? 0 : (BERSERK_SKILL?.cd || 20);
+      return { success:true, unlimited, cd };
+    }
+
+    function maybeHandleAutoBerserk(){
+      if(!state.inRun) return;
+      const autoLevel = state.skillsOwnedPassive?.berserkAuto || 0;
+      if(autoLevel <= 0) return;
+      if(!state.passive?.berserkAutoEnabled) return;
+      if(state.timeLeft > 5) return;
+      if(state.runFlags?.autoBerserkUsed) return;
+      const result = activateBerserk();
+      if(!result.success) return;
+      if(typeof result.cd === 'number'){ setCd('berserk', result.cd); }
+      state.runFlags.autoBerserkUsed = true;
+      SFX.skill();
+      renderSkillBar(); renderGrid(); renderTop();
+    }
+
     function useSkill(key){
       if(!state.inRun) return;
       const sk = ACTIVE_SKILLS.find(s=>s.key===key); if(!sk) return;
-      const cd = state.skillCooldowns[key]||0; if(cd>0){ SFX.deny(); return; }
+      const canBypassCd = key === 'berserk' && (state.timeLeft <= 5) && !!state.passive?.berserkUnlimit;
+      const cd = state.skillCooldowns[key]||0; if(cd>0 && !canBypassCd){ SFX.deny(); return; }
+      let cdOverride = null;
+      let used = true;
       switch(key){
-        case 'berserk': state.skillAtkBuffUntil = performance.now()+5000; SFX.skill(); break;
+        case 'berserk': {
+          const result = activateBerserk();
+          if(!result.success){ SFX.deny(); return; }
+          cdOverride = result.cd;
+          SFX.skill();
+          break;
+        }
         case 'timewarp': state.timeLeft = Math.min(20, +(state.timeLeft + 3).toFixed(1)); SFX.skill(); break;
         case 'meteor':
           for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const dmg = Math.max(10, Math.floor(o.maxHp*0.35)); o.hp -= dmg; if(o.hp<=0){ onOreBroken(i, o); } }
@@ -1159,8 +1249,11 @@ section[id^="tab-"].active{ display:block; }
             if(o.hp<=0){ onOreBroken(idx, o); }
           }
           SFX.skill(); break;
+        default: used = false;
       }
-      setCd(key, sk.cd);
+      if(!used) return;
+      const nextCd = (cdOverride !== null) ? cdOverride : sk.cd;
+      if(typeof nextCd === 'number'){ setCd(key, nextCd); }
       renderSkillBar(); renderGrid(); renderTop();
     }
 
@@ -1169,6 +1262,8 @@ section[id^="tab-"].active{ display:block; }
 
     function startRun(){
       if(state.inRun) return;
+      resetRunFlags();
+      state.skillAtkBuffUntil = 0;
       state.inRun = true;
       state.etherSpawned=false;
       state.timeLeft = 20;
@@ -1195,6 +1290,7 @@ section[id^="tab-"].active{ display:block; }
         if(!state.etherSpawned && elapsed >= etherDelay){ spawnEther(); }
         state.timeLeft = Math.max(0, +(state.timeLeft - 0.1).toFixed(1));
         for(const k of Object.keys(state.skillCooldowns)){ state.skillCooldowns[k] = Math.max(0, state.skillCooldowns[k]-0.1); }
+        maybeHandleAutoBerserk();
         if(state.timeLeft<=0){ bankAndExit(false); }
         renderTop(); renderSkillBar();
       },100);
