@@ -2170,6 +2170,14 @@ section[id^="tab-"].active{ display:block; }
       const backAmp = Math.min(baseOrbitRadius * 0.3, PET.swingRadius * 0.4);
       p.swingOscAmplitudeForward = forwardAmp;
       p.swingOscAmplitudeBack = backAmp;
+      if(!Number.isFinite(p.flowerPetals) || p.flowerPetals <= 0){
+        p.flowerPetals = 5;
+      }
+      if(!reuseCycle || !Number.isFinite(p.flowerPhase)){
+        p.flowerPhase = Math.random() * Math.PI * 2;
+      }
+      p.flowerBaseRadius = baseOrbitRadius;
+      p.flowerRadius = baseOrbitRadius;
       p.swingCooldownTimer = 0;
       p.swingLastOffset = 0;
       p.swingInitialDamageDone = !immediateStrike;
@@ -2249,61 +2257,32 @@ section[id^="tab-"].active{ display:block; }
       const linearOrbitSpeed = PET.moveSpeed * 0.9;
       const targetRadius = Math.max(ORE_RADIUS + 12, Number.isFinite(p.orbitRadius) ? p.orbitRadius : PET.swingRadius * 0.9);
       const radiusLerp = Math.min(1, dt * 6);
-      const currentRadius = Math.hypot(p.x - ore.x, p.y - ore.y) || targetRadius;
-      const newRadius = currentRadius + (targetRadius - currentRadius) * radiusLerp;
-      const oscDuration = Math.max(0.1, Number.isFinite(p.swingOscDuration) ? p.swingOscDuration : PET.atkInterval);
-      p.swingOscTimer = (p.swingOscTimer || 0) + dt;
-      let radiusBase = newRadius;
-      let axialOffset = 0;
-      if(oscDuration > 0.05){
-        const cycle = (p.swingOscTimer % oscDuration) / oscDuration;
-        const oscValue = Math.sin(cycle * Math.PI * 2);
-        const forwardAmp = Number.isFinite(p.swingOscAmplitudeForward) ? p.swingOscAmplitudeForward : newRadius * 0.25;
-        const backAmp = Number.isFinite(p.swingOscAmplitudeBack) ? p.swingOscAmplitudeBack : newRadius * 0.18;
-        if(oscValue >= 0){
-          axialOffset = -Math.abs(oscValue) * forwardAmp;
-        } else {
-          axialOffset = Math.abs(oscValue) * backAmp;
-        }
-        const maxForward = Math.max(0, radiusBase - (ORE_RADIUS + 10));
-        if(axialOffset < 0) axialOffset = Math.max(-maxForward, axialOffset);
-        const maxBack = PET.swingRadius * 1.4;
-        if(axialOffset > 0) axialOffset = Math.min(maxBack, axialOffset);
-        p.swingLastOffset = axialOffset;
-      } else {
-        p.swingLastOffset = 0;
-      }
-      p.orbitRadius = radiusBase;
+      const currentBase = Number.isFinite(p.flowerBaseRadius) ? p.flowerBaseRadius : targetRadius;
+      const newBaseRadius = currentBase + (targetRadius - currentBase) * radiusLerp;
+      p.flowerBaseRadius = newBaseRadius;
+      p.orbitRadius = newBaseRadius;
       const angularSpeed = (Number.isFinite(p.orbitAngularSpeed) && p.orbitAngularSpeed > 0)
         ? p.orbitAngularSpeed
-        : linearOrbitSpeed / Math.max(ORE_RADIUS + 8, radiusBase);
+        : linearOrbitSpeed / Math.max(ORE_RADIUS + 8, newBaseRadius);
       p.orbitAngularSpeed = angularSpeed;
       const baseAngle = Number.isFinite(p.orbitAngle) ? p.orbitAngle : Math.atan2(p.y - ore.y, p.x - ore.x);
       const nextAngle = baseAngle + dir * angularSpeed * dt;
       p.orbitAngle = nextAngle;
-      const desiredAxisAngle = normalizeAngle(nextAngle);
-      let axisAngle = Number.isFinite(p.swingOscAxisAngle) ? p.swingOscAxisAngle : desiredAxisAngle;
-      let axisVel = Number.isFinite(p.swingOscAxisVel) ? p.swingOscAxisVel : 0;
-      const angleDiff = normalizeAngle(desiredAxisAngle - axisAngle);
-      const followGain = 9;
-      axisVel += angleDiff * followGain * dt;
-      const damping = clamp(1 - dt * 4.2, 0.15, 1);
-      axisVel *= damping;
-      const maxVel = (angularSpeed * 1.4) + 1.5;
-      axisVel = clamp(axisVel, -maxVel, maxVel);
-      axisAngle = normalizeAngle(axisAngle + axisVel * dt);
-      const axisX = Math.cos(axisAngle);
-      const axisY = Math.sin(axisAngle);
-      p.swingOscAxisAngle = axisAngle;
-      p.swingOscAxisVel = axisVel;
-      p.swingOscAxisX = axisX;
-      p.swingOscAxisY = axisY;
+      const petals = Number.isFinite(p.flowerPetals) && p.flowerPetals > 0 ? p.flowerPetals : 5;
+      if(!Number.isFinite(p.flowerPhase)) p.flowerPhase = 0;
+      const roseInput = nextAngle + p.flowerPhase;
+      const roseNormalized = (Math.cos(petals * roseInput) + 1) * 0.5;
+      const minFactor = 0.55;
+      const maxFactor = 0.45;
+      const desiredRadius = Math.max(ORE_RADIUS + 10, newBaseRadius * (minFactor + maxFactor * roseNormalized));
+      const prevRadius = Number.isFinite(p.flowerRadius) ? p.flowerRadius : desiredRadius;
+      const smoothFactor = Math.min(1, dt * 10);
+      const radius = prevRadius + (desiredRadius - prevRadius) * smoothFactor;
+      p.flowerRadius = radius;
       const prevX = p.x;
       const prevY = p.y;
-      const circleX = ore.x + Math.cos(nextAngle) * radiusBase;
-      const circleY = ore.y + Math.sin(nextAngle) * radiusBase;
-      p.x = circleX + axisX * axialOffset;
-      p.y = circleY + axisY * axialOffset;
+      p.x = ore.x + Math.cos(nextAngle) * radius;
+      p.y = ore.y + Math.sin(nextAngle) * radius;
       const dtSafe = Math.max(dt, 0.016);
       p.vx = (p.x - prevX) / dtSafe;
       p.vy = (p.y - prevY) / dtSafe;
