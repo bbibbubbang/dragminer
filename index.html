@@ -310,7 +310,16 @@ section[id^="tab-"].active{ display:block; }
     const PASSIVE_SKILLS = window.PASSIVE_SKILL_DATA;
     const PASSIVE_DISPLAY_INFO = {
       power: { label:'기초공격력', unit:'', perLevel:1 },
-      sharp: { label:'치명타 확률', unit:'%', perLevel:3 },
+      sharp: {
+        label:'치명타 확률',
+        unit:'%',
+        calcTotal: (level) => Math.min(40, level * 3),
+        calcDelta: (level) => {
+          const current = Math.min(40, level * 3);
+          const next = Math.min(40, (level + 1) * 3);
+          return Math.max(0, next - current);
+        },
+      },
       merchant: { label:'판매 보너스', unit:'%', perLevel:10 },
       petmaster: { label:'펫', unit:'마리', perLevel:1 },
     };
@@ -955,7 +964,13 @@ section[id^="tab-"].active{ display:block; }
 
     function calcAtk() {
       const L = state.upgrades.atk?.level || 1;
-      const base = state.player.atkBase || 10;
+      const powerPassive = PASSIVE_SKILLS.find((sk) => sk.key === 'power');
+      const maxPowerLevel = powerPassive ? passiveMaxLevel(powerPassive) : 0;
+      const ownedPower = Math.min(maxPowerLevel, state.skillsOwnedPassive?.power || 0);
+      const baseFloor = 10 + ownedPower;
+      const storedBase = (typeof state.player.atkBase === 'number') ? state.player.atkBase : 10;
+      const base = Math.max(storedBase, baseFloor);
+      state.player.atkBase = base;
       const ATK_PER_LVL = 0.12;
       const ATK_MILE    = 0.35;
       const per   = Math.pow(1 + ATK_PER_LVL, Math.max(0, L - 1));
