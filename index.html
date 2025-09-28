@@ -1521,10 +1521,12 @@ section[id^="tab-"].active{ display:block; }
     }
 
     function restartSpawnTimer(){
-      const baseMs=2200; const level=state.upgrades.spawn.level;
-      let interval= baseMs*Math.pow(0.94, level);
+      const level = state.upgrades.spawn.level;
+      const baseInterval = (typeof window.spawnIntervalForLevel === 'function')
+        ? window.spawnIntervalForLevel(level)
+        : Math.max(600, 2200 * Math.pow(0.94, level));
+      let interval = baseInterval;
       if(state.skillHasteUntil > performance.now()) interval *= 0.5;
-      if(interval<600) interval=600;
       clearInterval(state.timers.spawn); state.timers.spawn = setInterval(spawnOre, interval);
     }
     function exitRun(){ if(!state.inRun) return; bankAndExit(false); }
