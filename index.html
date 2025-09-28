@@ -61,6 +61,7 @@
     /* Skills */
     .skillshop{display:grid;grid-template-columns:1fr;gap:10px}
     .skill-card{background:#0f1430;border:1px solid #273061;border-radius:12px;padding:10px}
+    .skill-card.owned-active{opacity:0.45}
     .skillbar{position:sticky;bottom:0;margin-top:8px;background:#0e1328;border:1px solid #1f2853;border-radius:12px;padding:6px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
     .skillbtn{height:44px;border-radius:10px;border:1px solid #30407a;background:#18224a;color:#dbe7ff;font-weight:800}
     .skillbtn.cd{position:relative}
@@ -163,10 +164,10 @@ section[id^="tab-"].active{ display:block; }
           <div class="row"><span>액티브 슬롯:</span> <b id="slotCount" class="mono">0/5</b></div>
         </div>
         <div class="slotlist" id="slotList"></div>
-        <h4 style="margin:10px 0 6px 0">액티브 스킬 상점</h4>
-        <div class="skillshop" id="skillShopActive"></div>
-        <h4 style="margin:14px 0 6px 0">패시브 스킬 상점</h4>
+        <h4 style="margin:10px 0 6px 0">패시브 스킬 상점</h4>
         <div class="skillshop" id="skillShopPassive"></div>
+        <h4 style="margin:14px 0 6px 0">액티브 스킬 상점</h4>
+        <div class="skillshop" id="skillShopActive"></div>
       </section>
 
       <section id="tab-aether" class="panel" >
@@ -944,38 +945,41 @@ section[id^="tab-"].active{ display:block; }
       $('#rebirthBuyBtn').disabled = !(canRebirth && afford && total>0);
     }
 
+    function syncSkillSlotsWithOwned(){
+      if(!Array.isArray(state.skillSlots)){
+        state.skillSlots = [null,null,null,null,null];
+      }
+      const desiredLength = Math.max(5, state.skillSlots.length);
+      if(state.skillSlots.length < desiredLength){
+        state.skillSlots = [...state.skillSlots, ...Array(desiredLength - state.skillSlots.length).fill(null)];
+      }
+      let changed = false;
+      for(let i=0;i<state.skillSlots.length;i++){
+        const def = ACTIVE_SKILLS[i];
+        const should = def && state.skillsOwnedActive[def.key] ? def.key : null;
+        if(state.skillSlots[i] !== should){
+          state.skillSlots[i] = should;
+          changed = true;
+        }
+      }
+      return changed;
+    }
+
     function renderSkills(){
+      const slotsUpdated = syncSkillSlotsWithOwned();
+      if(slotsUpdated){ save(); }
       const slotList = $('#slotList'); slotList.innerHTML='';
       for(let i=0;i<5;i++){
         const el=document.createElement('div'); el.className='slot'; const sk = state.skillSlots[i];
         el.textContent = sk ? ACTIVE_SKILLS.find(s=>s.key===sk).name : '+ 빈 슬롯';
         el.addEventListener('click', ()=>{
           SFX.ui();
-          if(state.skillSlots[i]){ state.skillSlots[i]=null; }
-          else {
-            const owned = Object.keys(state.skillsOwnedActive).filter(k=> state.skillsOwnedActive[k] && !state.skillSlots.includes(k));
-            if(owned.length===0) return toast('보유 액티브 스킬 없음');
-            state.skillSlots[i] = owned[0];
-          }
-          save(); renderSkills(); renderSkillBar();
+          toast('액티브 스킬은 자동으로 슬롯에 배치됩니다.');
         });
         slotList.appendChild(el);
       }
       $('#slotCount').textContent = state.skillSlots.filter(Boolean).length + '/5';
 
-      const shopA = $('#skillShopActive'); shopA.innerHTML='';
-      for(const sk of ACTIVE_SKILLS){
-        const owned = !!state.skillsOwnedActive[sk.key];
-        const card = document.createElement('div'); card.className = 'skill-card';
-        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">쿨타임 ${sk.cd}s</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned?'disabled':''}>${owned?'보유중':'구매'}</button></div>`;
-        if(!owned){
-          card.querySelector('.btn').addEventListener('click', ()=>{
-            if(!spendAe(sk.ae)) { SFX.deny(); return; }
-            state.skillsOwnedActive[sk.key]=true; toast(`${sk.name} 획득!`); SFX.ui(); save(); renderSkills(); renderTop();
-          });
-        }
-        shopA.appendChild(card);
-      }
       const shopP = $('#skillShopPassive'); shopP.innerHTML='';
       for(const sk of PASSIVE_SKILLS){
         const owned = !!state.skillsOwnedPassive[sk.key];
@@ -991,9 +995,24 @@ section[id^="tab-"].active{ display:block; }
         });
         shopP.appendChild(card);
       }
+      const shopA = $('#skillShopActive'); shopA.innerHTML='';
+      for(const sk of ACTIVE_SKILLS){
+        const owned = !!state.skillsOwnedActive[sk.key];
+        const card = document.createElement('div'); card.className = 'skill-card';
+        if(owned){ card.classList.add('owned-active'); }
+        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">쿨타임 ${sk.cd}s</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned?'disabled':''}>${owned?'보유중':'구매'}</button></div>`;
+        if(!owned){
+          card.querySelector('.btn').addEventListener('click', ()=>{
+            if(!spendAe(sk.ae)) { SFX.deny(); return; }
+            state.skillsOwnedActive[sk.key]=true; toast(`${sk.name} 획득!`); SFX.ui(); save(); renderSkills(); renderSkillBar(); renderTop();
+          });
+        }
+        shopA.appendChild(card);
+      }
     }
 
     function renderSkillBar(){
+      syncSkillSlotsWithOwned();
       if(!state.inRun){ skillBarEl.style.display='none'; return; }
       skillBarEl.style.display='grid'; skillBarEl.innerHTML='';
       for(let i=0;i<5;i++){
