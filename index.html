@@ -563,7 +563,15 @@ section[id^="tab-"].active{ display:block; }
       state.oreSales[o.key]=state.oreSales[o.key]||0;
     }
 
-    const PET = { moveSpeed: 220, atkInterval: 0.55, sepRadius: 24, atkRange: 18 };
+    const PET = {
+      moveSpeed: 220,
+      atkInterval: 0.55,
+      sepRadius: 24,
+      atkRange: 18,
+      swingDuration: 0.28,
+      swingArc: Math.PI * 0.85,
+      swingRadius: 28,
+    };
 
     const $ = sel => document.querySelector(sel);
     const gridEl = $('#grid');
@@ -1407,12 +1415,63 @@ section[id^="tab-"].active{ display:block; }
       const gr = gridRect();
       const width = Math.max(16, gr.width);
       const height = Math.max(16, gr.height);
-      for(let i=0;i<count;i++){ state.pets.push({ x: 8 + Math.random()*(width-16), y: 8 + Math.random()*(height-16), vx:0, vy:0, targetIdx:-1, cd:0 }); }
+      for(let i=0;i<count;i++){
+        state.pets.push({
+          x: 8 + Math.random()*(width-16),
+          y: 8 + Math.random()*(height-16),
+          vx:0,
+          vy:0,
+          targetIdx:-1,
+          cd:0,
+          swinging:false,
+          swingTime:0,
+          swingBaseAngle:0,
+          swingDir:1,
+          swingArc:PET.swingArc,
+          swingRadius:PET.swingRadius,
+        });
+      }
       renderPets();
     }
     function renderPets(){ gridEl.querySelectorAll('.pet').forEach(p=>p.remove()); gridRect(); for(const p of state.pets){ const el=document.createElement('div'); el.className='pet'; const localX = p.x - 8; const localY = p.y - 8; el.style.transform = `translate(${localX}px, ${localY}px)`; gridEl.appendChild(el); } }
     function findNearestOreIdx(x,y){ let best=-1, bestD=1e9; for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const d=Math.hypot(ore.x-x, ore.y-y); if(d<bestD){ bestD=d; best=i; } } return best; }
-    function petsFrame(ts){ if(!state.inRun) return; const gr=gridRect(); const dt=Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016); state.lastAnimTs=ts; for(const p of state.pets){ if(p.targetIdx<0 || !state.grid[p.targetIdx]) p.targetIdx = findNearestOreIdx(p.x,p.y); if(p.targetIdx>=0){ const c=cellCenter(p.targetIdx); const dx=c.x-p.x, dy=c.y-p.y; const dist=Math.hypot(dx,dy)||1; const speed = dist<28 ? PET.moveSpeed*(dist/28) : PET.moveSpeed; const steerX = (dx/dist)*speed - p.vx; const steerY = (dy/dist)*speed - p.vy; p.vx += steerX*0.12; p.vy += steerY*0.12; } else { p.vx += (Math.random()-0.5)*10*dt; p.vy += (Math.random()-0.5)*10*dt; } }
+    function startPetSwing(p, ore){
+      if(!ore) return;
+      const angle = Math.atan2(p.y - ore.y, p.x - ore.x);
+      p.swinging = true;
+      p.swingTime = 0;
+      p.swingBaseAngle = Number.isFinite(angle) ? angle : Math.random()*Math.PI*2;
+      p.swingDir = Math.random() < 0.5 ? -1 : 1;
+      const reach = Math.hypot(p.x - ore.x, p.y - ore.y) || PET.swingRadius;
+      const radius = Math.max(ORE_RADIUS + 6, Math.min(reach, PET.swingRadius));
+      const randomArc = PET.swingArc * (0.65 + Math.random()*0.7);
+      p.swingArc = randomArc;
+      p.swingRadius = radius;
+      p.vx *= 0.4;
+      p.vy *= 0.4;
+    }
+    function updateSwing(p, ore, dt){
+      if(!p.swinging || !ore) return false;
+      p.swingTime += dt;
+      const duration = PET.swingDuration;
+      const tRaw = Math.min(1, p.swingTime / duration);
+      const t = tRaw * tRaw;
+      const angle = p.swingBaseAngle + p.swingDir * p.swingArc * t;
+      const radius = Math.max(ORE_RADIUS, p.swingRadius * (1 - 0.35 * tRaw));
+      p.x = ore.x + Math.cos(angle) * radius;
+      p.y = ore.y + Math.sin(angle) * radius;
+      if(p.swingTime >= duration){
+        p.swinging = false;
+        p.cd = PET.atkInterval;
+        const exitAngle = angle + p.swingDir * 0.4;
+        p.vx = Math.cos(exitAngle) * PET.moveSpeed * 0.45;
+        p.vy = Math.sin(exitAngle) * PET.moveSpeed * 0.45;
+        hit(p.targetIdx,'pet');
+        return true;
+      }
+      return false;
+    }
+    function petsFrame(ts){ if(!state.inRun) return; const gr=gridRect(); const dt=Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016); state.lastAnimTs=ts; for(const p of state.pets){ if(p.swinging){ const ore = state.grid[p.targetIdx]; if(!ore){ p.swinging=false; p.targetIdx=-1; } continue; } if(p.targetIdx<0 || !state.grid[p.targetIdx]) p.targetIdx = findNearestOreIdx(p.x,p.y); if(p.targetIdx>=0){ const ore = state.grid[p.targetIdx]; if(!ore){ p.targetIdx=-1; continue; } const c=cellCenter(p.targetIdx); const dx=c.x-p.x, dy=c.y-p.y; const dist=Math.hypot(dx,dy)||1; const speed = dist<28 ? PET.moveSpeed*(dist/28) : PET.moveSpeed; const steerX = (dx/dist)*speed - p.vx; const steerY = (dy/dist)*speed - p.vy; p.vx += steerX*0.12; p.vy += steerY*0.12; } else { p.vx += (Math.random()-0.5)*10*dt; p.vy += (Math.random()-0.5)*10*dt; } }
       for(let i=0;i<state.pets.length;i++){
         for(let j=i+1;j<state.pets.length;j++){
           const a=state.pets[i], b=state.pets[j];
@@ -1434,22 +1493,30 @@ section[id^="tab-"].active{ display:block; }
         }
       }
       for(const p of state.pets){
+        const ore = p.targetIdx>=0 ? state.grid[p.targetIdx] : null;
+        if(p.swinging){
+          if(ore){
+            updateSwing(p, ore, dt);
+          } else {
+            p.swinging = false;
+            p.targetIdx = -1;
+          }
+          p.x = Math.max(8, Math.min(gr.width-8, p.x));
+          p.y = Math.max(8, Math.min(gr.height-8, p.y));
+          continue;
+        }
         p.x += p.vx*dt;
         p.y += p.vy*dt;
         p.x = Math.max(8, Math.min(gr.width-8, p.x));
         p.y = Math.max(8, Math.min(gr.height-8, p.y));
-        if(p.targetIdx>=0){
-          const ore = state.grid[p.targetIdx];
-          if(!ore){
-            p.targetIdx = -1;
-            continue;
-          }
-          const dist = Math.hypot(ore.x - p.x, ore.y - p.y);
-          p.cd -= dt;
-          if(dist<=PET.atkRange && p.cd<=0){
-            p.cd = PET.atkInterval;
-            hit(p.targetIdx,'pet');
-          }
+        if(!ore){
+          p.targetIdx = -1;
+          continue;
+        }
+        p.cd = Math.max(0, p.cd - dt);
+        const dist = Math.hypot(ore.x - p.x, ore.y - p.y);
+        if(p.cd<=0 && dist<=PET.swingRadius){
+          startPetSwing(p, ore);
         }
       }
       renderPets(); requestAnimationFrame(petsFrame); }
