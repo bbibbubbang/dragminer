@@ -932,6 +932,7 @@ section[id^="tab-"].active{ display:block; }
         li.innerHTML = `<h4>${t.name} <span class="small">(${t.key})</span></h4>`+
           `<div class="mono">레벨: ${lvl}</div>`+
           `<div class="mono">판매 금액: x${formatMultiplier(levelMul)}</div>`+
+          `<div class="mono">판매량: ${state.oreSales[t.key]||0}</div>`+
           `<div>가치: <span class="price">${Math.round(t.value*totalMul)}</span> 골드</div>`+
           `<div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">`+
             `<button class="btn secondary" data-sellall="${t.key}">모두 판매</button>`+
