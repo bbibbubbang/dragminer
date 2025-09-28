@@ -487,10 +487,10 @@ section[id^="tab-"].active{ display:block; }
       skillAtkBuffUntil: 0,
 
       // Passive bonuses
-      passive: { sellBonus: 0, petPlus: 0, berserkAutoEnabled:false, berserkUnlimit:false },
+      passive: { sellBonus: 0, petPlus: 0, berserkUnlimit:false },
 
       // Run-time flags
-      runFlags: { autoBerserkUsed:false },
+      runFlags: { berserkBoostActive:false, berserkBoostPrevExpiry:null },
 
       // Settings
       settings: { autoSell:false },
@@ -504,7 +504,6 @@ section[id^="tab-"].active{ display:block; }
       state.passive = state.passive || {};
       if(typeof state.passive.sellBonus !== 'number') state.passive.sellBonus = 0;
       if(typeof state.passive.petPlus !== 'number') state.passive.petPlus = 0;
-      if(typeof state.passive.berserkAutoEnabled !== 'boolean') state.passive.berserkAutoEnabled = false;
       if(typeof state.passive.berserkUnlimit !== 'boolean') state.passive.berserkUnlimit = false;
     }
 
@@ -521,7 +520,8 @@ section[id^="tab-"].active{ display:block; }
 
     function resetRunFlags(){
       state.runFlags = state.runFlags || {};
-      state.runFlags.autoBerserkUsed = false;
+      state.runFlags.berserkBoostActive = false;
+      state.runFlags.berserkBoostPrevExpiry = null;
     }
 
     function clampRunTime(value){
@@ -1498,12 +1498,26 @@ section[id^="tab-"].active{ display:block; }
 
     function activateBerserk(){
       if(!state.skillsOwnedActive?.berserk) return { success:false };
-      const unlimited = (state.timeLeft <= 5) && !!state.passive?.berserkUnlimit;
       const currentCd = state.skillCooldowns.berserk || 0;
-      if(!unlimited && currentCd > 0) return { success:false, reason:'cooldown' };
-      state.skillAtkBuffUntil = unlimited ? Infinity : performance.now()+5000;
-      const cd = unlimited ? 0 : (BERSERK_SKILL?.cd || 20);
-      return { success:true, unlimited, cd };
+      if(currentCd > 0) return { success:false, reason:'cooldown' };
+      const now = performance.now();
+      const newUntil = now + 5000;
+      const currentUntil = state.skillAtkBuffUntil;
+      if(currentUntil !== Infinity){
+        const finiteCurrent = Number.isFinite(currentUntil) ? currentUntil : 0;
+        state.skillAtkBuffUntil = Math.max(finiteCurrent, newUntil);
+      }
+      if(state.runFlags){
+        if(state.runFlags.berserkBoostActive){
+          const prev = state.runFlags.berserkBoostPrevExpiry;
+          const finitePrev = Number.isFinite(prev) ? prev : 0;
+          state.runFlags.berserkBoostPrevExpiry = Math.max(finitePrev, newUntil);
+        } else {
+          state.runFlags.berserkBoostPrevExpiry = null;
+        }
+      }
+      const cd = BERSERK_SKILL?.cd || 20;
+      return { success:true, cd };
     }
 
     const AUTO_TIMEWARP_THRESHOLD = 5;
@@ -1519,17 +1533,48 @@ section[id^="tab-"].active{ display:block; }
 
     function maybeHandleAutoBerserk(){
       if(!state.inRun) return;
-      const autoLevel = state.skillsOwnedPassive?.berserkAuto || 0;
-      if(autoLevel <= 0) return;
-      if(!state.passive?.berserkAutoEnabled) return;
-      if(state.timeLeft > 5) return;
-      if(state.runFlags?.autoBerserkUsed) return;
-      const result = activateBerserk();
-      if(!result.success) return;
-      if(typeof result.cd === 'number'){ setCd('berserk', result.cd); }
-      state.runFlags.autoBerserkUsed = true;
-      SFX.skill();
-      renderSkillBar(); renderGrid(); renderTop();
+      state.runFlags = state.runFlags || {};
+      const hasBoost = !!state.passive?.berserkUnlimit;
+      const finalPhase = state.timeLeft <= 5;
+      let needsUpdate = false;
+
+      if(hasBoost){
+        if(finalPhase){
+          if(!state.runFlags.berserkBoostActive){
+            state.runFlags.berserkBoostActive = true;
+            state.runFlags.berserkBoostPrevExpiry = Number.isFinite(state.skillAtkBuffUntil)
+              ? state.skillAtkBuffUntil
+              : null;
+            if(state.skillAtkBuffUntil !== Infinity){
+              state.skillAtkBuffUntil = Infinity;
+              needsUpdate = true;
+            }
+          }
+        } else if(state.runFlags.berserkBoostActive){
+          state.runFlags.berserkBoostActive = false;
+          const prev = state.runFlags.berserkBoostPrevExpiry;
+          state.runFlags.berserkBoostPrevExpiry = null;
+          if(state.skillAtkBuffUntil === Infinity){
+            if(Number.isFinite(prev) && prev > performance.now()){
+              state.skillAtkBuffUntil = prev;
+            } else {
+              state.skillAtkBuffUntil = 0;
+            }
+            needsUpdate = true;
+          }
+        }
+      } else if(state.runFlags.berserkBoostActive){
+        state.runFlags.berserkBoostActive = false;
+        state.runFlags.berserkBoostPrevExpiry = null;
+        if(state.skillAtkBuffUntil === Infinity){
+          state.skillAtkBuffUntil = 0;
+          needsUpdate = true;
+        }
+      }
+
+      if(needsUpdate){
+        renderSkillBar(); renderGrid(); renderTop();
+      }
     }
 
     function maybeHandleAutoSkills(){
@@ -1552,8 +1597,7 @@ section[id^="tab-"].active{ display:block; }
     function useSkill(key){
       if(!state.inRun) return;
       const sk = ACTIVE_SKILLS.find(s=>s.key===key); if(!sk) return;
-      const canBypassCd = key === 'berserk' && (state.timeLeft <= 5) && !!state.passive?.berserkUnlimit;
-      const cd = state.skillCooldowns[key]||0; if(cd>0 && !canBypassCd){ SFX.deny(); return; }
+      const cd = state.skillCooldowns[key]||0; if(cd>0){ SFX.deny(); return; }
       let cdOverride = null;
       let used = true;
       switch(key){
