@@ -1937,6 +1937,20 @@ section[id^="tab-"].active{ display:block; }
         swingNoiseScale:0,
         swingStartOffsetX:0,
         swingStartOffsetY:0,
+        swingStage:'idle',
+        swingChargeDuration:PET.atkInterval*0.4,
+        swingChargeStartX:0,
+        swingChargeStartY:0,
+        swingChargeEndX:0,
+        swingChargeEndY:0,
+        swingOscAngle:0,
+        swingOscAxisX:0,
+        swingOscAxisY:0,
+        swingOscDuration:PET.atkInterval,
+        swingOscAmplitudeForward:PET.swingRadius,
+        swingOscAmplitudeBack:PET.swingRadius*0.6,
+        swingOscTurnDir:1,
+        swingLastOffset:0,
         strafeDir:0,
         strafeTimer:0,
         engageState:'idle',
@@ -2035,67 +2049,43 @@ section[id^="tab-"].active{ display:block; }
       const dy = ore.y - p.y;
       const dist = Math.hypot(dx, dy) || 1;
       const approachMag = Math.hypot(approachVX, approachVY);
-      if(!reuseCycle){
-        p.swingCycleStage = 0;
-        p.swingOrientationAngle = null;
+      let approachAngle = approachMag > 0.01 ? Math.atan2(approachVY, approachVX) : Math.atan2(dy, dx);
+      if(!Number.isFinite(approachAngle)){
+        approachAngle = Math.atan2(dy, dx);
       }
-      if(!Number.isFinite(p.strafeDir) || p.strafeDir === 0){
-        p.strafeDir = (p.id || 0) % 2 === 0 ? 1 : -1;
-      } else {
-        p.strafeDir = p.strafeDir >= 0 ? 1 : -1;
-      }
-      if(!Number.isFinite(p.swingTurnDir) || !reuseCycle){
-        p.swingTurnDir = p.strafeDir;
-      }
-      if(!Number.isFinite(p.swingCycleStage)) p.swingCycleStage = 0;
-      let orientationAngle;
-      if(p.swingCycleStage === 0){
-        orientationAngle = -Math.PI/2;
-        p.swingCycleStage = 1;
-      } else if(p.swingCycleStage === 1){
-        orientationAngle = -Math.PI/2 + (p.swingTurnDir||1) * (Math.PI/2);
-        p.swingCycleStage = 2;
-      } else {
-        const fallback = -Math.PI/2 + (p.swingTurnDir||1) * (Math.PI/2);
-        orientationAngle = Number.isFinite(p.swingOrientationAngle) ? p.swingOrientationAngle : fallback;
-      }
-      p.swingOrientationAngle = orientationAngle;
-      const axisX = Math.cos(orientationAngle);
-      const axisY = Math.sin(orientationAngle);
-      const perpX = -axisY;
-      const perpY = axisX;
-      const alongAxis = (p.x - ore.x) * axisX + (p.y - ore.y) * axisY;
-      const swingDir = reuseCycle && p.swingDir ? -p.swingDir : (alongAxis >= 0 ? -1 : 1);
-      const reach = Math.max(ORE_RADIUS + 6, dist + Math.min(approachMag * 0.6, PET.swingRadius * 0.4));
-      const amplitude = Math.min(PET.swingRadius * 1.05, reach);
-      const inertiaBase = amplitude * (p.swingCycleStage >= 2 ? 0.55 : 0.42);
-      const inertia = Math.min(PET.swingRadius * 1.25, inertiaBase + approachMag * 0.85);
+      const axisX = Math.cos(approachAngle);
+      const axisY = Math.sin(approachAngle);
+      const travelForward = Math.min(PET.swingRadius * 1.4, dist + Math.max(12, approachMag * 0.8));
+      const travelBackward = Math.min(PET.swingRadius * 0.9, Math.max(ORE_RADIUS + 6, dist * 0.35));
+      const chargeEndX = ore.x + axisX * travelForward;
+      const chargeEndY = ore.y + axisY * travelForward;
       p.swinging = true;
+      p.swingStage = reuseCycle ? 'oscillate' : 'charge';
       p.swingTime = 0;
-      p.swingDir = swingDir;
-      p.swingBaseAngle = orientationAngle;
-      p.swingAxisX = axisX;
-      p.swingAxisY = axisY;
-      p.swingPerpX = perpX;
-      p.swingPerpY = perpY;
+      p.swingChargeDuration = Math.max(0.1, PET.atkInterval * 0.45);
+      p.swingChargeStartX = p.x;
+      p.swingChargeStartY = p.y;
+      p.swingChargeEndX = chargeEndX;
+      p.swingChargeEndY = chargeEndY;
+      if(!reuseCycle){
+        p.swingOscTurnDir = Math.random() < 0.5 ? -1 : 1;
+      }
+      const turnAngle = (Math.PI / 10) * (p.swingOscTurnDir || 1);
+      const oscAngle = reuseCycle && Number.isFinite(p.swingOscAngle) ? p.swingOscAngle : (approachAngle + turnAngle);
+      p.swingOscAngle = oscAngle;
+      p.swingOscAxisX = Math.cos(oscAngle);
+      p.swingOscAxisY = Math.sin(oscAngle);
+      p.swingOscDuration = Math.max(0.16, PET.atkInterval * 0.9);
+      p.swingOscAmplitudeForward = Math.max(ORE_RADIUS + 10, Math.min(PET.swingRadius * 1.2, travelForward));
+      p.swingOscAmplitudeBack = Math.max(ORE_RADIUS + 4, travelBackward);
+      p.swingLastOffset = 0;
+      p.swingInitialDamageDone = !immediateStrike;
+      p.lastApproachAngle = approachAngle;
+      p.lastApproachSpeed = approachMag;
+      p.lastApproachVX = approachMag > 0.01 ? axisX * approachMag : approachVX;
+      p.lastApproachVY = approachMag > 0.01 ? axisY * approachMag : approachVY;
       p.swingOriginX = ore.x;
       p.swingOriginY = ore.y;
-      p.swingAmplitude = amplitude;
-      p.swingInertia = inertia;
-      p.swingDuration = PET.atkInterval;
-      const strafeDir = p.strafeDir || p.swingTurnDir || 1;
-      const driftBias = strafeDir * (p.swingCycleStage >= 2 ? 0.32 : 0.2);
-      p.swingDriftAngle = orientationAngle + driftBias;
-      p.swingDriftStrength = amplitude * (p.swingCycleStage >= 2 ? 0.38 : 0.24);
-      p.swingNoiseSeed = Math.random()*Math.PI;
-      p.swingNoiseScale = p.swingCycleStage >= 2 ? 0.08 : 0;
-      p.swingStartOffsetX = p.x - ore.x;
-      p.swingStartOffsetY = p.y - ore.y;
-      p.swingInitialDamageDone = !immediateStrike;
-      p.lastApproachAngle = orientationAngle;
-      p.lastApproachSpeed = approachMag;
-      p.lastApproachVX = approachMag > 0 ? axisX * approachMag : approachVX;
-      p.lastApproachVY = approachMag > 0 ? axisY * approachMag : approachVY;
       return true;
     }
     function startPetSwing(p, ore){
@@ -2119,49 +2109,77 @@ section[id^="tab-"].active{ display:block; }
         }
         ore = currentOre;
       }
+      const stage = p.swingStage || 'charge';
+      if(stage === 'charge'){
+        const duration = Math.max(0.1, p.swingChargeDuration || PET.atkInterval * 0.45);
+        p.swingTime += dt;
+        const tRaw = Math.min(1, p.swingTime / duration);
+        const eased = tRaw * tRaw * (3 - 2 * tRaw);
+        const prevX = p.x;
+        const prevY = p.y;
+        const startX = Number.isFinite(p.swingChargeStartX) ? p.swingChargeStartX : p.x;
+        const startY = Number.isFinite(p.swingChargeStartY) ? p.swingChargeStartY : p.y;
+        const endX = Number.isFinite(p.swingChargeEndX) ? p.swingChargeEndX : ore.x;
+        const endY = Number.isFinite(p.swingChargeEndY) ? p.swingChargeEndY : ore.y;
+        p.x = startX + (endX - startX) * eased;
+        p.y = startY + (endY - startY) * eased;
+        if(!p.swingInitialDamageDone && eased >= 0.45){
+          p.swingInitialDamageDone = true;
+          hit(p.targetIdx,'pet',{ damageMul: p.damageMul || 1 });
+          const currentOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
+          if(!currentOre){
+            p.swinging = false;
+            p.swingStage = 'idle';
+            p.targetIdx = -1;
+            return true;
+          }
+          ore = currentOre;
+        }
+        if(tRaw >= 1){
+          const dtSafe = Math.max(dt, 0.016);
+          p.vx = (p.x - prevX) / dtSafe;
+          p.vy = (p.y - prevY) / dtSafe;
+          p.swingStage = 'oscillate';
+          p.swingTime = 0;
+          const startOffset = Number.isFinite(p.swingOscAmplitudeForward) ? p.swingOscAmplitudeForward : PET.swingRadius;
+          p.swingLastOffset = startOffset;
+        }
+        return false;
+      }
+      const duration = Math.max(0.16, p.swingOscDuration || PET.atkInterval * 0.9);
+      p.swingTime += dt;
+      const prevOffset = Number.isFinite(p.swingLastOffset) ? p.swingLastOffset : 0;
+      const angle = Number.isFinite(p.swingOscAngle) ? p.swingOscAngle : Math.atan2(ore.y - p.y, ore.x - p.x);
+      const axisX = Math.cos(angle);
+      const axisY = Math.sin(angle);
+      const ampF = Number.isFinite(p.swingOscAmplitudeForward) ? p.swingOscAmplitudeForward : PET.swingRadius;
+      const ampB = Number.isFinite(p.swingOscAmplitudeBack) ? p.swingOscAmplitudeBack : PET.swingRadius * 0.6;
+      const cycle = ((p.swingTime / duration) + 0.25) % 1;
+      const wave = Math.sin(cycle * Math.PI * 2);
+      const offset = wave >= 0 ? wave * ampF : wave * ampB;
       const prevX = p.x;
       const prevY = p.y;
-      p.swingTime += dt;
-      const duration = Math.max(0.12, p.swingDuration || PET.atkInterval);
-      const tRaw = Math.min(1, p.swingTime / duration);
-      const axisX = p.swingAxisX || 1;
-      const axisY = p.swingAxisY || 0;
-      const perpX = p.swingPerpX || 0;
-      const perpY = p.swingPerpY || 1;
-      const dir = p.swingDir || 1;
-      const forward = Math.sin(tRaw * Math.PI) * dir;
-      const parabola = 1 - Math.pow((tRaw - 0.5) * 2, 2);
-      const driftStrength = p.swingDriftStrength || 0;
-      const driftAngle = p.swingDriftAngle || 0;
-      const driftProgress = tRaw * tRaw;
-      const driftX = Math.cos(driftAngle) * driftStrength * driftProgress;
-      const driftY = Math.sin(driftAngle) * driftStrength * driftProgress;
-      const noiseScale = Number.isFinite(p.swingNoiseScale) ? p.swingNoiseScale : 1;
-      const noise = Math.sin(tRaw * Math.PI * 4 + (p.swingNoiseSeed||0)) * 2 * tRaw * noiseScale;
-      const originX = Number.isFinite(p.swingOriginX) ? p.swingOriginX : ore.x;
-      const originY = Number.isFinite(p.swingOriginY) ? p.swingOriginY : ore.y;
-      const amplitude = p.swingAmplitude || PET.swingRadius;
-      const inertia = p.swingInertia || (PET.swingRadius * 0.5);
-      const startOffsetX = (p.swingStartOffsetX || 0) * (1 - tRaw);
-      const startOffsetY = (p.swingStartOffsetY || 0) * (1 - tRaw);
-      const offsetX = axisX * forward * amplitude + perpX * parabola * inertia + driftX + noise * perpX;
-      const offsetY = axisY * forward * amplitude + perpY * parabola * inertia + driftY + noise * perpY;
-      p.x = originX + startOffsetX + offsetX;
-      p.y = originY + startOffsetY + offsetY;
-      if(p.swingTime >= duration){
-        const dtSafe = Math.max(dt, 0.016);
-        p.vx = (p.x - prevX) / dtSafe * 0.6;
-        p.vy = (p.y - prevY) / dtSafe * 0.6;
+      p.x = ore.x + axisX * offset;
+      p.y = ore.y + axisY * offset;
+      const dtSafe = Math.max(dt, 0.016);
+      p.vx = (p.x - prevX) / dtSafe;
+      p.vy = (p.y - prevY) / dtSafe;
+      const crossed = (prevOffset >= 0 && offset < 0) || (prevOffset <= 0 && offset > 0);
+      if(crossed && Math.abs(prevOffset) > 2 && Math.abs(offset) < (ORE_RADIUS + 6)){
         hit(p.targetIdx,'pet',{ damageMul: p.damageMul || 1 });
-        const nextOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
-        if(nextOre){
-          configurePetSwing(p, nextOre, true, p.vx, p.vy, false);
-        } else {
+        const currentOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
+        if(!currentOre){
           p.swinging = false;
+          p.swingStage = 'idle';
           p.swingTime = 0;
           p.targetIdx = -1;
+          return true;
         }
-        return true;
+        ore = currentOre;
+      }
+      p.swingLastOffset = offset;
+      if(p.swingTime >= duration){
+        p.swingTime -= duration;
       }
       return false;
     }
