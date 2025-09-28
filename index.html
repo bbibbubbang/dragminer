@@ -321,7 +321,15 @@ section[id^="tab-"].active{ display:block; }
         },
       },
       merchant: { label:'판매 보너스', unit:'%', perLevel:10 },
-      petmaster: { label:'펫', unit:'마리', perLevel:1 },
+      petmaster: {
+        label:'펫',
+        unit:'마리',
+        perLevel:1,
+        formatDelta: (value) => {
+          const num = Number.isFinite(value) ? value : 0;
+          return Number.isInteger(num) ? num.toString() : num.toFixed(2).replace(/\.0+$/,'').replace(/0+$/,'');
+        },
+      },
     };
     const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
     const UPGRADE_INFO = window.UPGRADE_INFO;
@@ -1231,7 +1239,7 @@ section[id^="tab-"].active{ display:block; }
       if(isMaxed){ return baseText; }
       const deltaValue = cfg.calcDelta ? cfg.calcDelta(safeLevel) : (cfg.perLevel ?? 0);
       if(!deltaValue){ return baseText; }
-      const deltaText = formatPassiveValue(deltaValue, cfg);
+      const deltaText = cfg.formatDelta ? cfg.formatDelta(deltaValue, cfg) : formatPassiveValue(deltaValue, cfg);
       return `${baseText} (+${deltaText})`;
     }
 
