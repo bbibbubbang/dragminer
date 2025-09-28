@@ -27,7 +27,7 @@ window.REBIRTH_PERK_DATA = [
   {
     key: 'etherHaste',
     name: '에테르 공명',
-    desc: '에테르 등장 -1초(최소 5초)',
+    desc: '에테르 등장 -0.5초',
     base: 36,
     scale: 1.6,
     max: 10,

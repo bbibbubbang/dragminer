@@ -177,7 +177,7 @@ section[id^="tab-"].active{ display:block; }
         </div>
         <div class="ae-card">
           <h4>환생 준비</h4>
-          <div class="ae-meta">지하 20층 이상에서 환생 가능. 아래 보너스를 이번 환생에 함께 구매할 수 있습니다.</div>
+          <div class="ae-meta">지하 20층 이상에서 환생 가능. 아래 보너스를 이번 환생에 함께 구매할 수 있습니다. 에테르로 구매한 스킬들은 환생해도 초기화되지 않습니다.</div>
           <div id="rebirthPerks" class="aether-grid" style="margin-top:8px"></div>
           <div class="row" style="justify-content:space-between;margin-top:8px">
             <div class="mono">총 비용: <b id="rebirthTotal">0</b> 에테르</div>
@@ -1136,9 +1136,17 @@ section[id^="tab-"].active{ display:block; }
         const cost = perkCost(p);
         const checked = !!rebirthPick[p.key];
         const row = document.createElement('div'); row.className='skill-card';
-        row.innerHTML = `<div class="row" style="justify-content:space-between"><b>${p.name}</b><span class="mono">${p.desc}</span></div>
-                         <div class="row" style="justify-content:space-between;margin-top:6px">
-                           <div class="mono">레벨 ${lvl}/${p.max} · 비용 ${cost} 에테르</div>
+        const header = `<div class="row" style="justify-content:space-between"><b>${p.name}</b><span class="mono">Lv ${lvl}/${p.max}</span></div>`;
+        const desc = `<div class="mono" style="opacity:.8;margin:4px 0 6px 0">${p.desc}</div>`;
+        let extra = '';
+        if(p.key === 'etherHaste'){
+          const delay = Math.max(0, 15 - (lvl * 0.5));
+          const formatted = Number.isInteger(delay) ? delay.toFixed(0) : delay.toFixed(1);
+          extra = `<div class="mono" style="margin:0 0 6px 0">현재 등장: ${formatted}초</div>`;
+        }
+        row.innerHTML = header + desc + extra +
+                         `<div class="row" style="justify-content:space-between;margin-top:6px">
+                           <div class="mono">비용 ${cost} 에테르</div>
                            <label class="row" style="gap:6px;align-items:center">
                              <input type="checkbox" ${checked?'checked':''} ${maxed?'disabled':''} data-perk="${p.key}">
                              <span>${maxed?'최대':''}선택</span>
@@ -1190,9 +1198,16 @@ section[id^="tab-"].active{ display:block; }
 
       const shopP = $('#skillShopPassive'); shopP.innerHTML='';
       for(const sk of PASSIVE_SKILLS){
-        const owned = !!state.skillsOwnedPassive[sk.key];
+        const ownedCount = state.skillsOwnedPassive[sk.key] || 0;
+        const owned = ownedCount > 0;
+        const currentText = sk.once
+          ? `현재: ${Math.min(1, ownedCount)}/1`
+          : `현재: ${ownedCount}회`;
         const card = document.createElement('div'); card.className = 'skill-card';
-        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">패시브</span></div><div class="mono" style="opacity:.8;margin:4px 0 8px 0">${sk.desc}</div><div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned && sk.once?'disabled':''}>${owned?(sk.once?'보유중':'추가 구매'):'구매'}</button></div>`;
+        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">패시브</span></div>`+
+                         `<div class="mono" style="opacity:.8;margin:4px 0 4px 0">${sk.desc}</div>`+
+                         `<div class="mono" style="margin:0 0 8px 0">${currentText}</div>`+
+                         `<div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned && sk.once?'disabled':''}>${owned?(sk.once?'보유중':'추가 구매'):'구매'}</button></div>`;
         const buyBtn = card.querySelector('.btn');
         if(buyBtn){
           buyBtn.addEventListener('click', ()=>{
@@ -1369,8 +1384,8 @@ section[id^="tab-"].active{ display:block; }
         if(!state.inRun) return;
         const now = performance.now();
         const elapsed = (now - state.runStartTs)/1000;
-        let etherDelay = 10 + Math.min(state.floor*0.5, 20) - (state.aether?.etherHaste||0);
-        etherDelay = Math.max(5, etherDelay);
+        const etherHasteLevel = state.aether?.etherHaste || 0;
+        const etherDelay = 15 - (etherHasteLevel * 0.5);
         if(!state.etherSpawned && elapsed >= etherDelay){ spawnEther(); }
         state.timeLeft = Math.max(0, +(state.timeLeft - 0.1).toFixed(1));
         for(const k of Object.keys(state.skillCooldowns)){ state.skillCooldowns[k] = Math.max(0, state.skillCooldowns[k]-0.1); }
