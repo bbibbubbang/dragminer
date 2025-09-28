@@ -25,7 +25,8 @@ window.PASSIVE_SKILL_DATA = [
     ae:150,
     once:true,
     apply: ({ state }) => {
-      state.player.critChance = Math.min(0.5, state.player.critChance + 0.03);
+      const base = (typeof state.player.critChanceBase === 'number') ? state.player.critChanceBase : (state.player.critChance || 0.10);
+      state.player.critChanceBase = Math.min(0.5, base + 0.03);
     },
   },
   {

@@ -309,6 +309,7 @@ section[id^="tab-"].active{ display:block; }
     const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
     const UPGRADE_INFO = window.UPGRADE_INFO;
     const UPGRADE_DEFAULTS = window.UPGRADE_DEFAULTS;
+    const UPGRADE_CONFIG = window.UPGRADE_CONFIG;
     const VERSION = 'miner_v2.6.1';
     // 고정 세이브키 + 구버전 마이그레이션
     const SAVE_KEY = 'miner_save_v1';
@@ -420,7 +421,7 @@ section[id^="tab-"].active{ display:block; }
 
     // ---------- Game State ----------
     const state = {
-      player: { atkBase: 10, atk: 10, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
+      player: { atkBase: 10, atk: 10, critChanceBase: 0.10, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
       upgrades: (()=>{
         const defaults = {};
         for(const [key, def] of Object.entries(UPGRADE_DEFAULTS||{})){
@@ -463,9 +464,10 @@ section[id^="tab-"].active{ display:block; }
     // ---------- Save/Load (stable key + migration) ----------
     function save(){
       const { atk, ...player } = state.player;
+      const { critChance, ...restPlayer } = player;
       const payload = {
         __version: VERSION,
-        player,
+        player: restPlayer,
         upgrades:state.upgrades, floor:state.floor, highestFloor:state.highestFloor,
         inventory:state.inventory, skillsOwnedActive:state.skillsOwnedActive, skillsOwnedPassive:state.skillsOwnedPassive,
         skillSlots:state.skillSlots, passive:state.passive, aether:state.aether, settings:state.settings
@@ -485,7 +487,16 @@ section[id^="tab-"].active{ display:block; }
         const s = JSON.parse(raw);
         Object.assign(state.player,s.player||{});
         delete state.player.atk;
-        Object.assign(state.upgrades,s.upgrades||{});
+        const savedUpgrades = s.upgrades || {};
+        if(savedUpgrades.oreMul && typeof savedUpgrades.oreMul === 'object'){
+          state.upgrades.oreMul = { ...state.upgrades.oreMul, ...savedUpgrades.oreMul };
+        }
+        for(const [key, def] of Object.entries(UPGRADE_DEFAULTS || {})){
+          const saved = savedUpgrades[key];
+          const lvl = typeof saved === 'number' ? saved
+            : (saved && typeof saved.level === 'number' ? saved.level : def.level || 0);
+          state.upgrades[key] = { level: Math.max(0, lvl) };
+        }
         state.floor=s.floor||1; state.highestFloor=s.highestFloor||1;
         state.inventory=s.inventory||state.inventory;
         state.skillsOwnedActive=s.skillsOwnedActive||{};
@@ -496,6 +507,15 @@ section[id^="tab-"].active{ display:block; }
         state.settings = s.settings || state.settings;
         if(typeof state.player.atkBase === 'undefined'){
           state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 10;
+        }
+        if(typeof state.player.critChanceBase !== 'number'){
+          const savedCrit = typeof s.player?.critChance === 'number' ? s.player.critChance : state.player.critChance;
+          const critCfg = UPGRADE_CONFIG?.crit;
+          const perLevel = critCfg?.effectPerLevel || 0;
+          const critLvl = state.upgrades?.crit?.level || 0;
+          const estimatedBase = typeof savedCrit === 'number' ? savedCrit - (perLevel * critLvl) : undefined;
+          const base = (typeof estimatedBase === 'number' && !Number.isNaN(estimatedBase)) ? estimatedBase : 0.10;
+          state.player.critChanceBase = Math.min(0.5, Math.max(0.01, +base.toFixed(4)));
         }
       }catch(e){ console.warn('load failed', e); }
     }
@@ -803,6 +823,16 @@ section[id^="tab-"].active{ display:block; }
       return upgMul * passiveMul;
     }
 
+    function calcCritChance(){
+      const cfg = UPGRADE_CONFIG?.crit;
+      const base = (typeof state.player.critChanceBase === 'number') ? state.player.critChanceBase : 0.10;
+      const lvl = state.upgrades.crit?.level || 0;
+      const perLevel = cfg?.effectPerLevel || 0.02;
+      const total = Math.min(0.5, Math.max(0, +(base + (perLevel * lvl)).toFixed(4)));
+      state.player.critChance = total;
+      return total;
+    }
+
     function calcAtk() {
       const L = state.upgrades.atk?.level || 1;
       const base = state.player.atkBase || 10;
@@ -812,6 +842,7 @@ section[id^="tab-"].active{ display:block; }
       const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, L - 1) / 10));
       const atk = Math.max(1, Math.ceil(base * per * bonus));
       state.player.atk = atk;
+      calcCritChance();
       return atk;
     }
 

@@ -1,17 +1,51 @@
 // Upgrade metadata and defaults
-window.UPGRADE_DEFAULTS = {
-  atk:   { level: 1, baseCost: 90,  scale: 1.28 },
-  crit:  { level: 0, baseCost: 150, scale: 1.55 },
-  spawn: { level: 0, baseCost: 240, scale: 1.65 },
-  pet:   { level: 0, baseCost: 450, scale: 1.85 },
+const UPGRADE_CONFIG = {
+  atk: {
+    defaultLevel: 1,
+    baseCost: 90,
+    costScale: 0.45,
+  },
+  crit: {
+    defaultLevel: 0,
+    baseCost: 150,
+    costScale: 0.5,
+    effectPerLevel: 0.02,
+  },
+  spawn: {
+    defaultLevel: 0,
+    baseCost: 240,
+    costScale: 0.55,
+  },
+  pet: {
+    defaultLevel: 0,
+    baseCost: 450,
+    costScale: 0.6,
+  },
 };
+
+window.UPGRADE_CONFIG = UPGRADE_CONFIG;
+
+window.UPGRADE_DEFAULTS = Object.fromEntries(
+  Object.entries(UPGRADE_CONFIG).map(([key, cfg]) => [key, { level: cfg.defaultLevel || 0 }])
+);
+
+function upgradeCostLinear(state, key) {
+  const cfg = UPGRADE_CONFIG[key];
+  if (!cfg) return 0;
+  const entry = state.upgrades[key] || {};
+  const currentLevel = typeof entry.level === 'number' ? entry.level : (cfg.defaultLevel || 0);
+  const baseLevel = cfg.defaultLevel || 0;
+  const steps = Math.max(0, currentLevel - baseLevel);
+  const scale = typeof cfg.costScale === 'number' ? cfg.costScale : 0;
+  return Math.floor(cfg.baseCost * (1 + steps * scale));
+}
 
 window.UPGRADE_INFO = [
   {
     key: 'atk',
     title: '🗡️ 공격력',
     getDescription: (state) => `현재: ${state.player.atk} (레벨 ${state.upgrades.atk.level})`,
-    getCost: (state) => Math.floor(state.upgrades.atk.baseCost * Math.pow(state.upgrades.atk.scale, state.upgrades.atk.level - 1)),
+    getCost: (state) => upgradeCostLinear(state, 'atk'),
     canBuy: () => true,
     onBuy: ({ state }) => {
       state.upgrades.atk.level++;
@@ -21,18 +55,17 @@ window.UPGRADE_INFO = [
     key: 'crit',
     title: '🎯 치명타 확률',
     getDescription: (state) => `현재: ${(state.player.critChance * 100).toFixed(1)}%`,
-    getCost: (state) => Math.floor(state.upgrades.crit.baseCost * Math.pow(state.upgrades.crit.scale, state.upgrades.crit.level)),
+    getCost: (state) => upgradeCostLinear(state, 'crit'),
     canBuy: (state) => (state.player.critChance >= 0.5 ? '최대 50%' : true),
     onBuy: ({ state }) => {
       state.upgrades.crit.level++;
-      state.player.critChance = Math.min(0.5, state.player.critChance + 0.02);
     },
   },
   {
     key: 'spawn',
     title: '⚙️ 생성 속도',
     getDescription: (state) => `레벨: ${state.upgrades.spawn.level}`,
-    getCost: (state) => Math.floor(state.upgrades.spawn.baseCost * Math.pow(state.upgrades.spawn.scale, state.upgrades.spawn.level)),
+    getCost: (state) => upgradeCostLinear(state, 'spawn'),
     canBuy: () => true,
     onBuy: ({ state, restartSpawnTimer }) => {
       state.upgrades.spawn.level++;
@@ -43,7 +76,7 @@ window.UPGRADE_INFO = [
     key: 'pet',
     title: '🤖 자동채굴 펫',
     getDescription: (state) => `보유: ${(state.upgrades.pet.level + (state.passive?.petPlus || 0) + (state.aether?.petPlus || 0))}마리`,
-    getCost: (state) => Math.floor(state.upgrades.pet.baseCost * Math.pow(state.upgrades.pet.scale, state.upgrades.pet.level)),
+    getCost: (state) => upgradeCostLinear(state, 'pet'),
     canBuy: () => true,
     onBuy: ({ state, spawnPets }) => {
       state.upgrades.pet.level++;
