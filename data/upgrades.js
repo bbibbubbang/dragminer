@@ -20,6 +20,7 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 450,
     costScale: 0.6,
+    maxLevel: 100,
   },
 };
 
@@ -44,7 +45,9 @@ window.UPGRADE_INFO = [
   {
     key: 'atk',
     title: '🗡️ 공격력',
-    getDescription: (state) => `현재: ${state.player.atk} (레벨 ${state.upgrades.atk.level})`,
+    getLevel: (state) => state.upgrades.atk.level,
+    getLevelLabel: (state) => `Lv ${state.upgrades.atk.level}`,
+    getDescription: (state) => `현재 공격력: ${state.player.atk}`,
     getCost: (state) => upgradeCostLinear(state, 'atk'),
     canBuy: () => true,
     onBuy: ({ state }) => {
@@ -54,9 +57,11 @@ window.UPGRADE_INFO = [
   {
     key: 'crit',
     title: '🎯 치명타 확률',
-    getDescription: (state) => `현재: ${(state.player.critChance * 100).toFixed(1)}%`,
+    getLevel: (state) => state.upgrades.crit.level,
+    getLevelLabel: (state) => `Lv ${state.upgrades.crit.level}`,
+    getDescription: (state) => `현재 치명타 확률: ${(state.player.critChance * 100).toFixed(1)}%`,
     getCost: (state) => upgradeCostLinear(state, 'crit'),
-    canBuy: (state) => (state.player.critChance >= 0.5 ? '최대 50%' : true),
+    canBuy: () => true,
     onBuy: ({ state }) => {
       state.upgrades.crit.level++;
     },
@@ -64,7 +69,15 @@ window.UPGRADE_INFO = [
   {
     key: 'spawn',
     title: '⚙️ 생성 속도',
-    getDescription: (state) => `레벨: ${state.upgrades.spawn.level}`,
+    getLevel: (state) => state.upgrades.spawn.level,
+    getLevelLabel: (state) => `Lv ${state.upgrades.spawn.level}`,
+    getDescription: (state) => {
+      const level = state.upgrades.spawn.level;
+      const baseMs = 2200;
+      let interval = baseMs * Math.pow(0.94, level);
+      if (interval < 600) interval = 600;
+      return `현재 생성 간격: ${(interval / 1000).toFixed(2)}초`;
+    },
     getCost: (state) => upgradeCostLinear(state, 'spawn'),
     canBuy: () => true,
     onBuy: ({ state, restartSpawnTimer }) => {
@@ -75,9 +88,22 @@ window.UPGRADE_INFO = [
   {
     key: 'pet',
     title: '🤖 자동채굴 펫',
+    getLevel: (state) => state.upgrades.pet.level,
+    getLevelLabel: (state) => {
+      const level = state.upgrades.pet.level;
+      const max = UPGRADE_CONFIG.pet.maxLevel || 0;
+      return max ? `Lv ${level}/${max}` : `Lv ${level}`;
+    },
     getDescription: (state) => `보유: ${(state.upgrades.pet.level + (state.passive?.petPlus || 0) + (state.aether?.petPlus || 0))}마리`,
     getCost: (state) => upgradeCostLinear(state, 'pet'),
-    canBuy: () => true,
+    canBuy: (state) => {
+      const max = UPGRADE_CONFIG.pet.maxLevel || Infinity;
+      const current = state.upgrades.pet.level || 0;
+      if (current >= max) {
+        return `최대 ${max}마리까지 구매 가능합니다.`;
+      }
+      return true;
+    },
     onBuy: ({ state, spawnPets }) => {
       state.upgrades.pet.level++;
       if (state.inRun) spawnPets();
