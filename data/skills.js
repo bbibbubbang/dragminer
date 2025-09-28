@@ -11,9 +11,10 @@ window.PASSIVE_SKILL_DATA = [
   {
     key:'power',
     name:'강화 채굴',
-    desc:'공격력 +1(기초)',
+    desc:'기초공격력 +1',
     ae:120,
     once:true,
+    maxLevel:1,
     apply: ({ state }) => {
       state.player.atkBase = (state.player.atkBase || 10) + 1;
     },
@@ -21,9 +22,10 @@ window.PASSIVE_SKILL_DATA = [
   {
     key:'sharp',
     name:'예리함',
-    desc:'치명타 확률 +3% (최대 50%)',
+    desc:'치명타 확률 +3%',
     ae:150,
     once:true,
+    maxLevel:1,
     apply: ({ state }) => {
       const base = (typeof state.player.critChanceBase === 'number') ? state.player.critChanceBase : (state.player.critChance || 0.10);
       state.player.critChanceBase = Math.min(0.5, base + 0.03);
@@ -32,9 +34,10 @@ window.PASSIVE_SKILL_DATA = [
   {
     key:'merchant',
     name:'상인 감각',
-    desc:'판매가 +10%',
+    desc:'판매 보너스 +10%',
     ae:180,
     once:false,
+    maxLevel:20,
     apply: ({ state }) => {
       state.passive.sellBonus = (state.passive.sellBonus || 0) + 0.10;
     },
@@ -42,9 +45,10 @@ window.PASSIVE_SKILL_DATA = [
   {
     key:'petmaster',
     name:'펫 조련',
-    desc:'펫 +1',
+    desc:'펫 +1마리',
     ae:200,
     once:false,
+    maxLevel:20,
     apply: ({ state, spawnPets }) => {
       state.passive.petPlus = (state.passive.petPlus || 0) + 1;
       if(state.inRun && typeof spawnPets === 'function') spawnPets();

@@ -308,6 +308,12 @@ section[id^="tab-"].active{ display:block; }
     const ACTIVE_SKILLS = window.ACTIVE_SKILL_DATA;
     const BERSERK_SKILL = ACTIVE_SKILLS.find(s=>s.key==='berserk');
     const PASSIVE_SKILLS = window.PASSIVE_SKILL_DATA;
+    const PASSIVE_DISPLAY_INFO = {
+      power: { label:'기초공격력', unit:'', perLevel:1 },
+      sharp: { label:'치명타 확률', unit:'%', perLevel:3 },
+      merchant: { label:'판매 보너스', unit:'%', perLevel:10 },
+      petmaster: { label:'펫', unit:'마리', perLevel:1 },
+    };
     const REBIRTH_PERKS = window.REBIRTH_PERK_DATA;
     const UPGRADE_INFO = window.UPGRADE_INFO;
     const UPGRADE_DEFAULTS = window.UPGRADE_DEFAULTS;
@@ -1180,6 +1186,40 @@ section[id^="tab-"].active{ display:block; }
       return changed;
     }
 
+    function passiveMaxLevel(sk){
+      if(typeof sk.maxLevel === 'number' && sk.maxLevel > 0){ return sk.maxLevel; }
+      if(sk.once){ return 1; }
+      return 20;
+    }
+
+    function formatPassiveValue(value, cfg){
+      const num = Number.isFinite(value) ? value : 0;
+      let str;
+      if(cfg && typeof cfg.decimals === 'number'){
+        str = num.toFixed(cfg.decimals);
+      }else if(Number.isInteger(num)){
+        str = num.toString();
+      }else{
+        str = num.toFixed(2).replace(/\.0+$/,'').replace(/0+$/,'');
+      }
+      if(cfg?.unit === '%'){ return `${str}%`; }
+      if(cfg?.unit){ return `${str}${cfg.unit}`; }
+      return str;
+    }
+
+    function buildPassiveStatLine(sk, level, isMaxed){
+      const cfg = PASSIVE_DISPLAY_INFO[sk.key];
+      if(!cfg){ return ''; }
+      const safeLevel = Math.max(0, level);
+      const totalValue = cfg.calcTotal ? cfg.calcTotal(safeLevel) : safeLevel * (cfg.perLevel ?? 0);
+      const baseText = `${cfg.label} ${formatPassiveValue(totalValue, cfg)}`;
+      if(isMaxed){ return baseText; }
+      const deltaValue = cfg.calcDelta ? cfg.calcDelta(safeLevel) : (cfg.perLevel ?? 0);
+      if(!deltaValue){ return baseText; }
+      const deltaText = formatPassiveValue(deltaValue, cfg);
+      return `${baseText} (+${deltaText})`;
+    }
+
     function renderSkills(){
       ensurePassiveDefaults();
       const slotsUpdated = syncSkillSlotsWithOwned();
@@ -1199,23 +1239,33 @@ section[id^="tab-"].active{ display:block; }
       const shopP = $('#skillShopPassive'); shopP.innerHTML='';
       for(const sk of PASSIVE_SKILLS){
         const ownedCount = state.skillsOwnedPassive[sk.key] || 0;
+        const maxLevel = passiveMaxLevel(sk);
+        const displayLevel = Math.min(ownedCount, maxLevel);
+        const isMaxed = ownedCount >= maxLevel;
         const owned = ownedCount > 0;
-        const currentText = sk.once
-          ? `현재: ${Math.min(1, ownedCount)}/1`
-          : `현재: ${ownedCount}회`;
+        const levelLabel = `Lv ${displayLevel}/${maxLevel}`;
+        const statLine = buildPassiveStatLine(sk, displayLevel, isMaxed);
         const card = document.createElement('div'); card.className = 'skill-card';
-        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">패시브</span></div>`+
-                         `<div class="mono" style="opacity:.8;margin:4px 0 4px 0">${sk.desc}</div>`+
-                         `<div class="mono" style="margin:0 0 8px 0">${currentText}</div>`+
-                         `<div class="row" style="justify-content:space-between"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${owned && sk.once?'disabled':''}>${owned?(sk.once?'보유중':'추가 구매'):'구매'}</button></div>`;
+        const descBlock = sk.desc ? `<div class="mono" style="opacity:.8;margin:4px 0 ${statLine?4:8}px 0">${sk.desc}</div>` : '';
+        const statBlock = statLine ? `<div class="mono" style="margin:0 0 8px 0">${statLine}</div>` : '';
+        const buttonLabel = isMaxed
+          ? (sk.once ? '보유중' : '최대 레벨')
+          : (owned ? '추가 구매' : '구매');
+        const buttonDisabled = isMaxed;
+        const buttonRow = `<div class="row" style="justify-content:space-between${(!statLine && !sk.desc)?';margin-top:8px':''}"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${buttonDisabled?'disabled':''}>${buttonLabel}</button></div>`;
+        card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">${levelLabel}</span></div>`+
+                         descBlock +
+                         statBlock +
+                         buttonRow;
         const buyBtn = card.querySelector('.btn');
         if(buyBtn){
           buyBtn.addEventListener('click', ()=>{
+            if(ownedCount >= maxLevel){ toast('최대 레벨입니다.'); SFX.deny(); return; }
             if(!spendAe(sk.ae)) { SFX.deny(); return; }
-            if(sk.once && owned){ toast('이미 보유'); SFX.deny(); return; }
             if(!state.skillsOwnedPassive[sk.key]) state.skillsOwnedPassive[sk.key]=0;
-            state.skillsOwnedPassive[sk.key] += 1;
-            if(typeof sk.apply === 'function'){ sk.apply({ state, spawnPets }); }
+            const nextLevel = Math.min(maxLevel, state.skillsOwnedPassive[sk.key] + 1);
+            state.skillsOwnedPassive[sk.key] = nextLevel;
+            if(typeof sk.apply === 'function'){ sk.apply({ state, restartSpawnTimer, spawnPets }); }
             ensurePassiveDefaults();
             toast(`${sk.name} 적용!`); SFX.ui(); save(); renderSkills(); renderUpgrades(); renderTop();
           });
