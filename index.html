@@ -559,8 +559,9 @@ section[id^="tab-"].active{ display:block; }
     for(const o of ORES){
       state.inventory[o.key]=state.inventory[o.key]||0;
       state.loot[o.key]=0;
-      state.upgrades.oreMul[o.key]=state.upgrades.oreMul[o.key]||0;
       state.oreSales[o.key]=state.oreSales[o.key]||0;
+      const initialLevel = Math.max(0, Math.floor((state.oreSales[o.key]||0) / 10));
+      state.upgrades.oreMul[o.key]=initialLevel;
     }
 
     const PET = {
@@ -855,7 +856,13 @@ section[id^="tab-"].active{ display:block; }
     function oreIndexFromPoint(x,y){ const gr = gridRect(); const localX = x - gr.left; const localY = y - gr.top; if(localX<0 || localY<0 || localX>gr.width || localY>gr.height) return -1; for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const h=ORE_RADIUS; if(localX>=o.x-h && localX<=o.x+h && localY>=o.y-h && localY<=o.y+h) return i; } return -1; }
 
     function oreLevel(key){
-      return state.upgrades.oreMul[key]||0;
+      if(!key) return 0;
+      const sold = state.oreSales?.[key] || 0;
+      const level = Math.max(0, Math.floor(sold / 10));
+      if(state.upgrades?.oreMul){
+        state.upgrades.oreMul[key] = level;
+      }
+      return level;
     }
 
     function levelMultiplier(level){
@@ -880,18 +887,18 @@ section[id^="tab-"].active{ display:block; }
       const oreInfo = ORE_BY_KEY.get(key);
       const passiveMul = 1 + (state.passive.sellBonus||0);
       let sold = state.oreSales[key]||0;
-      let level = sold * 10;
-      const prevLevel = level;
+      const prevLevel = Math.max(0, Math.floor(sold / 10));
       let remaining = amount;
       let gold = 0;
       while(remaining>0){
-        const lvlMul = levelMultiplier(level);
+        const currentLevel = Math.max(0, Math.floor(sold / 10));
+        const lvlMul = levelMultiplier(currentLevel);
         gold += baseValue * lvlMul * passiveMul;
         sold += 1;
         remaining -= 1;
-        level = sold * 10;
       }
       state.oreSales[key] = sold;
+      const level = Math.max(0, Math.floor(sold / 10));
       state.upgrades.oreMul[key] = level;
       if(level !== prevLevel){
         const oreName = oreInfo?.name || key;
@@ -1429,49 +1436,213 @@ section[id^="tab-"].active{ display:block; }
           swingDir:1,
           swingArc:PET.swingArc,
           swingRadius:PET.swingRadius,
+          wanderAngle: Math.random()*Math.PI*2,
+          wanderTimer: Math.random()*0.5,
+          wanderSpeed: 30 + Math.random()*20,
+          swingAxisX:0,
+          swingAxisY:0,
+          swingPerpX:0,
+          swingPerpY:0,
+          swingOriginX:0,
+          swingOriginY:0,
+          swingAmplitude:PET.swingRadius,
+          swingInertia:PET.swingRadius*0.5,
+          swingDriftAngle:0,
+          swingDriftStrength:0,
+          swingNoiseSeed:Math.random()*Math.PI*2,
+          swingStartOffsetX:0,
+          swingStartOffsetY:0,
         });
       }
       renderPets();
     }
     function renderPets(){ gridEl.querySelectorAll('.pet').forEach(p=>p.remove()); gridRect(); for(const p of state.pets){ const el=document.createElement('div'); el.className='pet'; const localX = p.x - 8; const localY = p.y - 8; el.style.transform = `translate(${localX}px, ${localY}px)`; gridEl.appendChild(el); } }
     function findNearestOreIdx(x,y){ let best=-1, bestD=1e9; for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const d=Math.hypot(ore.x-x, ore.y-y); if(d<bestD){ bestD=d; best=i; } } return best; }
+    function findNearestOreFromList(x,y,indices){
+      let best=-1, bestD=1e9;
+      for(const idx of indices){
+        const ore = state.grid[idx];
+        if(!ore) continue;
+        const d = Math.hypot(ore.x - x, ore.y - y);
+        if(d < bestD){
+          bestD = d;
+          best = idx;
+        }
+      }
+      return best;
+    }
+    function choosePetTarget(p, oreIndices){
+      if(!oreIndices.length) return -1;
+      const multiPets = state.pets.length >= 2;
+      const multiOres = oreIndices.length >= 2;
+      if(!(multiPets && multiOres)){
+        return findNearestOreFromList(p.x, p.y, oreIndices);
+      }
+      const targetedByOthers = new Set();
+      for(const other of state.pets){
+        if(other === p) continue;
+        const idx = other.targetIdx;
+        if(idx>=0 && state.grid[idx]) targetedByOthers.add(idx);
+      }
+      const untargeted = oreIndices.filter(idx => !targetedByOthers.has(idx));
+      if(untargeted.length){
+        return findNearestOreFromList(p.x, p.y, untargeted);
+      }
+      return findNearestOreFromList(p.x, p.y, oreIndices);
+    }
     function startPetSwing(p, ore){
       if(!ore) return;
-      const angle = Math.atan2(p.y - ore.y, p.x - ore.x);
+      const baseAngle = Math.random()*Math.PI*2;
+      const axisX = Math.cos(baseAngle);
+      const axisY = Math.sin(baseAngle);
+      const perpX = -axisY;
+      const perpY = axisX;
       p.swinging = true;
       p.swingTime = 0;
-      p.swingBaseAngle = Number.isFinite(angle) ? angle : Math.random()*Math.PI*2;
       p.swingDir = Math.random() < 0.5 ? -1 : 1;
       const reach = Math.hypot(p.x - ore.x, p.y - ore.y) || PET.swingRadius;
-      const radius = Math.max(ORE_RADIUS + 6, Math.min(reach, PET.swingRadius));
-      const randomArc = PET.swingArc * (0.65 + Math.random()*0.7);
-      p.swingArc = randomArc;
-      p.swingRadius = radius;
+      const amplitude = Math.max(ORE_RADIUS + 6, Math.min(reach, PET.swingRadius * (0.9 + Math.random()*0.6)));
+      const inertia = amplitude * (0.45 + Math.random()*0.55);
+      p.swingAxisX = axisX;
+      p.swingAxisY = axisY;
+      p.swingPerpX = perpX;
+      p.swingPerpY = perpY;
+      p.swingOriginX = ore.x;
+      p.swingOriginY = ore.y;
+      p.swingAmplitude = amplitude;
+      p.swingInertia = inertia;
+      p.swingDriftAngle = Math.random()*Math.PI*2;
+      p.swingDriftStrength = 6 + Math.random()*12;
+      p.swingNoiseSeed = Math.random()*Math.PI*2;
+      p.swingStartOffsetX = p.x - ore.x;
+      p.swingStartOffsetY = p.y - ore.y;
       p.vx *= 0.4;
       p.vy *= 0.4;
     }
     function updateSwing(p, ore, dt){
       if(!p.swinging || !ore) return false;
+      const prevX = p.x;
+      const prevY = p.y;
       p.swingTime += dt;
-      const duration = PET.swingDuration;
+      const duration = PET.swingDuration * 1.35;
       const tRaw = Math.min(1, p.swingTime / duration);
-      const t = tRaw * tRaw;
-      const angle = p.swingBaseAngle + p.swingDir * p.swingArc * t;
-      const radius = Math.max(ORE_RADIUS, p.swingRadius * (1 - 0.35 * tRaw));
-      p.x = ore.x + Math.cos(angle) * radius;
-      p.y = ore.y + Math.sin(angle) * radius;
+      const axisX = p.swingAxisX || 1;
+      const axisY = p.swingAxisY || 0;
+      const perpX = p.swingPerpX || 0;
+      const perpY = p.swingPerpY || 1;
+      const dir = p.swingDir || 1;
+      const forward = Math.sin(tRaw * Math.PI) * dir;
+      const parabola = 1 - Math.pow((tRaw - 0.5) * 2, 2);
+      const driftStrength = p.swingDriftStrength || 0;
+      const driftAngle = p.swingDriftAngle || 0;
+      const driftProgress = tRaw * tRaw;
+      const driftX = Math.cos(driftAngle) * driftStrength * driftProgress;
+      const driftY = Math.sin(driftAngle) * driftStrength * driftProgress;
+      const noise = Math.sin(tRaw * Math.PI * 4 + (p.swingNoiseSeed||0)) * 2 * tRaw;
+      const originX = Number.isFinite(p.swingOriginX) ? p.swingOriginX : ore.x;
+      const originY = Number.isFinite(p.swingOriginY) ? p.swingOriginY : ore.y;
+      const amplitude = p.swingAmplitude || PET.swingRadius;
+      const inertia = p.swingInertia || (PET.swingRadius * 0.5);
+      const startOffsetX = (p.swingStartOffsetX || 0) * (1 - tRaw);
+      const startOffsetY = (p.swingStartOffsetY || 0) * (1 - tRaw);
+      const offsetX = axisX * forward * amplitude + perpX * parabola * inertia + driftX + noise * perpX;
+      const offsetY = axisY * forward * amplitude + perpY * parabola * inertia + driftY + noise * perpY;
+      p.x = originX + startOffsetX + offsetX;
+      p.y = originY + startOffsetY + offsetY;
       if(p.swingTime >= duration){
         p.swinging = false;
         p.cd = PET.atkInterval;
-        const exitAngle = angle + p.swingDir * 0.4;
-        p.vx = Math.cos(exitAngle) * PET.moveSpeed * 0.45;
-        p.vy = Math.sin(exitAngle) * PET.moveSpeed * 0.45;
+        const dtSafe = Math.max(dt, 0.016);
+        p.vx = (p.x - prevX) / dtSafe * 0.6;
+        p.vy = (p.y - prevY) / dtSafe * 0.6;
         hit(p.targetIdx,'pet');
         return true;
       }
       return false;
     }
-    function petsFrame(ts){ if(!state.inRun) return; const gr=gridRect(); const dt=Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016); state.lastAnimTs=ts; for(const p of state.pets){ if(p.swinging){ const ore = state.grid[p.targetIdx]; if(!ore){ p.swinging=false; p.targetIdx=-1; } continue; } if(p.targetIdx<0 || !state.grid[p.targetIdx]) p.targetIdx = findNearestOreIdx(p.x,p.y); if(p.targetIdx>=0){ const ore = state.grid[p.targetIdx]; if(!ore){ p.targetIdx=-1; continue; } const c=cellCenter(p.targetIdx); const dx=c.x-p.x, dy=c.y-p.y; const dist=Math.hypot(dx,dy)||1; const speed = dist<28 ? PET.moveSpeed*(dist/28) : PET.moveSpeed; const steerX = (dx/dist)*speed - p.vx; const steerY = (dy/dist)*speed - p.vy; p.vx += steerX*0.12; p.vy += steerY*0.12; } else { p.vx += (Math.random()-0.5)*10*dt; p.vy += (Math.random()-0.5)*10*dt; } }
+    function petsFrame(ts){
+      if(!state.inRun) return;
+      const gr = gridRect();
+      const dt = Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016);
+      state.lastAnimTs = ts;
+      const oreIndices = [];
+      for(let i=0;i<25;i++){
+        if(state.grid[i]) oreIndices.push(i);
+      }
+      const multiPets = state.pets.length >= 2;
+      const multiOres = oreIndices.length >= 2;
+      for(const p of state.pets){
+        if(p.swinging){
+          const ore = state.grid[p.targetIdx];
+          if(!ore){
+            p.swinging=false;
+            p.targetIdx=-1;
+          }
+          continue;
+        }
+        if(p.targetIdx<0 || !state.grid[p.targetIdx]){
+          p.targetIdx = choosePetTarget(p, oreIndices);
+        } else if(multiPets && multiOres){
+          let shared = false;
+          for(const other of state.pets){
+            if(other === p) continue;
+            if(other.targetIdx === p.targetIdx && state.grid[p.targetIdx]){
+              shared = true;
+              break;
+            }
+          }
+          if(shared){
+            const newIdx = choosePetTarget(p, oreIndices);
+            if(newIdx !== -1 && newIdx !== p.targetIdx){
+              p.targetIdx = newIdx;
+            }
+          }
+        }
+        const ore = p.targetIdx>=0 ? state.grid[p.targetIdx] : null;
+        if(ore){
+          const dx = ore.x - p.x;
+          const dy = ore.y - p.y;
+          const dist = Math.hypot(dx,dy) || 1;
+          const speed = dist<36 ? PET.moveSpeed*(dist/36) : PET.moveSpeed;
+          const desiredVX = (dx/dist)*speed;
+          const desiredVY = (dy/dist)*speed;
+          p.vx += (desiredVX - p.vx) * 0.08;
+          p.vy += (desiredVY - p.vy) * 0.08;
+          p.wanderTimer = (p.wanderTimer || 0) - dt;
+          if(p.wanderTimer <= 0){
+            p.wanderTimer = 0.35 + Math.random()*0.45;
+            p.wanderAngle = Math.random()*Math.PI*2;
+            p.wanderSpeed = 35 + Math.random()*45;
+          }
+          const wanderSpeed = p.wanderSpeed || 0;
+          const wanderAngle = p.wanderAngle || 0;
+          p.vx += Math.cos(wanderAngle) * wanderSpeed * dt * 0.6;
+          p.vy += Math.sin(wanderAngle) * wanderSpeed * dt * 0.6;
+          p.vx += (Math.random()-0.5) * 10 * dt;
+          p.vy += (Math.random()-0.5) * 10 * dt;
+        } else {
+          p.wanderTimer = (p.wanderTimer || 0) - dt;
+          if(p.wanderTimer <= 0){
+            p.wanderTimer = 0.6 + Math.random()*0.6;
+            p.wanderAngle = Math.random()*Math.PI*2;
+            p.wanderSpeed = 30 + Math.random()*60;
+          }
+          const wanderSpeed = p.wanderSpeed || 0;
+          const wanderAngle = p.wanderAngle || 0;
+          p.vx += Math.cos(wanderAngle) * wanderSpeed * dt;
+          p.vy += Math.sin(wanderAngle) * wanderSpeed * dt;
+          p.vx *= 0.97;
+          p.vy *= 0.97;
+          p.targetIdx = -1;
+        }
+        const maxSpeed = PET.moveSpeed * 1.4;
+        const velMag = Math.hypot(p.vx, p.vy);
+        if(velMag > maxSpeed){
+          const scale = maxSpeed / velMag;
+          p.vx *= scale;
+          p.vy *= scale;
+        }
+      }
       for(const p of state.pets){
         const ore = p.targetIdx>=0 ? state.grid[p.targetIdx] : null;
         if(p.swinging){
@@ -1499,7 +1670,9 @@ section[id^="tab-"].active{ display:block; }
           startPetSwing(p, ore);
         }
       }
-      renderPets(); requestAnimationFrame(petsFrame); }
+      renderPets();
+      requestAnimationFrame(petsFrame);
+    }
 
     const TAB_IDS = ['dungeon','inventory','upgrades','skills','aether','settings'];
     function activateTab(tabId){
