@@ -1,6 +1,6 @@
 // Active and passive skill definitions
 window.ACTIVE_SKILL_DATA = [
-  { key:'berserk',  name:'광폭화',   desc:'5초간 공격력 x2',         ae:150, cd:20 },
+  { key:'berserk',  name:'광폭화',   desc:'5초간 공격력 x2',         ae:50,  cd:20 },
   { key:'timewarp', name:'타임워프', desc:'시간 +3초(최대 20초)',    ae:120, cd:25 },
   { key:'meteor',   name:'운석 낙하', desc:'모든 광석에 큰 피해',    ae:200, cd:30 },
   { key:'haste',    name:'가속',     desc:'5초간 생성 속도 2배',     ae:140, cd:25 },

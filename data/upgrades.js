@@ -1,9 +1,9 @@
 // Upgrade metadata and defaults
 window.UPGRADE_DEFAULTS = {
-  atk:   { level: 1, baseCost: 90,  scale: 1.35 },
-  crit:  { level: 0, baseCost: 150, scale: 1.7  },
-  spawn: { level: 0, baseCost: 240, scale: 1.8  },
-  pet:   { level: 0, baseCost: 450, scale: 2.0  },
+  atk:   { level: 1, baseCost: 90,  scale: 1.28 },
+  crit:  { level: 0, baseCost: 150, scale: 1.55 },
+  spawn: { level: 0, baseCost: 240, scale: 1.65 },
+  pet:   { level: 0, baseCost: 450, scale: 1.85 },
 };
 
 window.UPGRADE_INFO = [
