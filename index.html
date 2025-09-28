@@ -990,16 +990,20 @@ section[id^="tab-"].active{ display:block; }
         const el = document.createElement('div');
         el.className='ore';
         el.style.background=ore.bg;
-        let localX=ore.x-ORE_RADIUS;
-        let localY=ore.y-ORE_RADIUS;
+        let localX = ore.x - ORE_RADIUS;
+        let localY = ore.y - ORE_RADIUS;
         const maxLeft = Math.max(0, gr.width - ORE_SIZE);
         const maxTop = Math.max(0, gr.height - ORE_SIZE);
-        if(localX < 0 || localX > maxLeft){
-          localX = Math.min(Math.max(0, localX), maxLeft);
+        const minLeft = Math.max(0, (axisX?.min ?? axisX?.start ?? ORE_RADIUS) - ORE_RADIUS);
+        const minTop = Math.max(0, (axisY?.min ?? axisY?.start ?? ORE_RADIUS) - ORE_RADIUS);
+        const safeLeft = Math.min(Math.max(minLeft, (axisX?.max ?? axisX?.start ?? ORE_RADIUS) - ORE_RADIUS), maxLeft);
+        const safeTop = Math.min(Math.max(minTop, (axisY?.max ?? axisY?.start ?? ORE_RADIUS) - ORE_RADIUS), maxTop);
+        if(localX < minLeft || localX > safeLeft){
+          localX = Math.min(Math.max(localX, minLeft), safeLeft);
           ore.x = localX + ORE_RADIUS;
         }
-        if(localY < 0 || localY > maxTop){
-          localY = Math.min(Math.max(0, localY), maxTop);
+        if(localY < minTop || localY > safeTop){
+          localY = Math.min(Math.max(localY, minTop), safeTop);
           ore.y = localY + ORE_RADIUS;
         }
         el.style.transform=`translate(${localX}px, ${localY}px)`;
