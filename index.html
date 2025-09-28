@@ -563,7 +563,7 @@ section[id^="tab-"].active{ display:block; }
           const critLvl = state.upgrades?.crit?.level || 0;
           const estimatedBase = typeof savedCrit === 'number' ? savedCrit - (perLevel * critLvl) : undefined;
           const base = (typeof estimatedBase === 'number' && !Number.isNaN(estimatedBase)) ? estimatedBase : 0.10;
-          state.player.critChanceBase = Math.min(0.5, Math.max(0.01, +base.toFixed(4)));
+          state.player.critChanceBase = Math.max(0.01, +base.toFixed(4));
         }
       }catch(e){ console.warn('load failed', e); }
     }
@@ -965,7 +965,8 @@ section[id^="tab-"].active{ display:block; }
       const base = (typeof state.player.critChanceBase === 'number') ? state.player.critChanceBase : 0.10;
       const lvl = state.upgrades.crit?.level || 0;
       const perLevel = cfg?.effectPerLevel || 0.02;
-      const total = Math.min(0.5, Math.max(0, +(base + (perLevel * lvl)).toFixed(4)));
+      const totalRaw = base + (perLevel * lvl);
+      const total = Math.max(0, +totalRaw.toFixed(4));
       state.player.critChance = total;
       return total;
     }
@@ -1125,7 +1126,11 @@ section[id^="tab-"].active{ display:block; }
       for(const info of UPGRADE_INFO || []){
         const desc = typeof info.getDescription === 'function' ? info.getDescription(state) : '';
         const cost = typeof info.getCost === 'function' ? info.getCost(state) : 0;
-        cont.appendChild(upgradeCard(info.title, desc, cost, ()=>{
+        const baseLevel = typeof info.getLevel === 'function' ? info.getLevel(state) : null;
+        const levelLabel = typeof info.getLevelLabel === 'function'
+          ? info.getLevelLabel(state)
+          : (baseLevel !== null && baseLevel !== undefined ? `Lv ${baseLevel}` : '');
+        cont.appendChild(upgradeCard(info.title, levelLabel, desc, cost, ()=>{
           const check = typeof info.canBuy === 'function' ? info.canBuy(state) : true;
           if(check !== true){
             if(typeof check === 'string' && check){ toast(check); }
@@ -1143,7 +1148,23 @@ section[id^="tab-"].active{ display:block; }
         }));
       }
     }
-    function upgradeCard(title, desc, cost, onBuy){ const wrap=document.createElement('div'); wrap.className='inv-item'; wrap.innerHTML = `<h4 style="margin:0 0 4px 0">${title}</h4><div class="mono">${desc}</div><div class="row" style="margin-top:8px;justify-content:space-between"><div class="row"><span>가격:</span> <b class="price">${cost}</b></div><button class="btn">구매</button></div>`; wrap.querySelector('.btn').addEventListener('click', onBuy); return wrap; }
+    function upgradeCard(title, levelLabel, desc, cost, onBuy){
+      const wrap=document.createElement('div');
+      wrap.className='inv-item';
+      const headerRight = levelLabel ? `<span class="mono">${levelLabel}</span>` : '';
+      wrap.innerHTML = `
+        <div class="row" style="justify-content:space-between;align-items:center;margin:0 0 4px 0">
+          <h4 style="margin:0">${title}</h4>
+          ${headerRight}
+        </div>
+        <div class="mono">${desc}</div>
+        <div class="row" style="margin-top:8px;justify-content:space-between">
+          <div class="row"><span>가격:</span> <b class="price">${cost}</b></div>
+          <button class="btn">구매</button>
+        </div>`;
+      wrap.querySelector('.btn').addEventListener('click', onBuy);
+      return wrap;
+    }
     function spend(amount){ if(state.player.gold < amount){ toast('골드 부족'); return false; } state.player.gold -= amount; return true; }
     function spendAe(amount){ if(state.player.ether < amount){ toast('에테르 부족'); return false; } state.player.ether -= amount; return true; }
 
@@ -1505,6 +1526,40 @@ section[id^="tab-"].active{ display:block; }
       if(cleared && state.aether?.autoAdvanceOwned && state.aether.autoAdvanceEnabled){
         setTimeout(()=>{ startRun(); }, 250);
       }
+    }
+
+    function cancelRunWithoutRewards(){
+      if(!state.inRun) return;
+      for(const k in state.loot){ state.loot[k] = 0; }
+      state.inRun = false;
+      clearInterval(state.timers.spawn); state.timers.spawn = null;
+      clearInterval(state.timers.tick); state.timers.tick = null;
+      state.pets = [];
+      state.lastAnimTs = 0;
+      state.grid = new Array(25).fill(null);
+      state.timeLeft = 0;
+      renderSkillBar();
+      gridRectCache = null;
+      refresh();
+    }
+
+    function resetGoldProgression(){
+      const freshUpgrades = {};
+      for(const [key, def] of Object.entries(UPGRADE_DEFAULTS || {})){
+        const baseLevel = def && typeof def.level === 'number' ? def.level : 0;
+        freshUpgrades[key] = { level: baseLevel };
+      }
+      freshUpgrades.oreMul = {};
+      state.upgrades = freshUpgrades;
+      state.player.gold = 0;
+      for(const ore of ORES){
+        state.inventory[ore.key] = 0;
+        state.oreSales[ore.key] = 0;
+        state.loot[ore.key] = 0;
+        state.upgrades.oreMul[ore.key] = 0;
+      }
+      state.floor = 1;
+      state.highestFloor = 1;
     }
 
     function spawnOre(){
@@ -2054,10 +2109,14 @@ section[id^="tab-"].active{ display:block; }
       if(!confirm('선택한 보너스를 구매하고 환생하시겠습니까?')) return;
       state.player.ether -= total;
       for(const p of chosen){ if(typeof p.apply === 'function') p.apply({ state }); }
-      if(state.inRun) bankAndExit(false);
-      state.floor = 1; state.aether.rebirths = (state.aether.rebirths||0)+1;
+      if(state.inRun) cancelRunWithoutRewards();
+      resetGoldProgression();
+      state.aether.rebirths = (state.aether.rebirths||0)+1;
       for(const k in rebirthPick){ delete rebirthPick[k]; }
-      save(); renderAether(); renderTop(); toast('보너스 구매 및 환생 완료!');
+      save();
+      renderAether();
+      refresh();
+      toast('보너스 구매 및 환생 완료!');
     });
     document.addEventListener('change', (e)=>{
       const t = e.target;
