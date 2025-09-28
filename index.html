@@ -586,21 +586,21 @@ section[id^="tab-"].active{ display:block; }
     const GRID_SAFE_MARGIN = 6;
 
     function spawnAxisInfo(size){
-      const safeSize = Math.max(ORE_SIZE, size || 0);
-      const extra = Math.max(0, safeSize - ORE_SIZE);
-      const margin = Math.min(GRID_SAFE_MARGIN, extra / 2);
-      const span = Math.max(0, safeSize - 2 * (ORE_RADIUS + margin));
-      const start = ORE_RADIUS + margin;
-      return { start, span };
+      const actual = Math.max(0, size || 0);
+      const available = Math.max(0, actual - ORE_SIZE);
+      const margin = Math.min(GRID_SAFE_MARGIN, available / 2);
+      const minCenter = ORE_RADIUS + margin;
+      const maxCenter = Math.max(minCenter, actual - (ORE_RADIUS + margin));
+      const span = Math.max(0, maxCenter - minCenter);
+      return { start: minCenter, span, min: minCenter, max: maxCenter, size: actual };
     }
 
     function clampAxisValue(val, axis){
       if(!axis) return val;
-      const start = Number.isFinite(axis.start) ? axis.start : 0;
-      const span = Math.max(0, Number.isFinite(axis.span) ? axis.span : 0);
-      const min = start;
-      const max = start + span;
-      if(!Number.isFinite(val)) return start;
+      const min = Number.isFinite(axis.min) ? axis.min : Number.isFinite(axis.start) ? axis.start : 0;
+      const maxRaw = Number.isFinite(axis.max) ? axis.max : (Number.isFinite(axis.start) ? axis.start : 0) + Math.max(0, Number.isFinite(axis.span) ? axis.span : 0);
+      const max = Math.max(min, maxRaw);
+      if(!Number.isFinite(val)) return min;
       if(max <= min) return min;
       return Math.min(max, Math.max(min, val));
     }
@@ -609,6 +609,14 @@ section[id^="tab-"].active{ display:block; }
       if(!ore) return;
       ore.x = clampAxisValue(ore.x, axisX);
       ore.y = clampAxisValue(ore.y, axisY);
+      const gridWidth = axisX?.size ?? gridRectCache?.width ?? gridRect().width ?? ORE_SIZE;
+      const gridHeight = axisY?.size ?? gridRectCache?.height ?? gridRect().height ?? ORE_SIZE;
+      const minCenterX = ORE_RADIUS;
+      const maxCenterX = Math.max(minCenterX, gridWidth - ORE_RADIUS);
+      const minCenterY = ORE_RADIUS;
+      const maxCenterY = Math.max(minCenterY, gridHeight - ORE_RADIUS);
+      ore.x = Math.min(Math.max(ore.x, minCenterX), maxCenterX);
+      ore.y = Math.min(Math.max(ore.y, minCenterY), maxCenterY);
     }
 
     const playGamesCardEl = document.getElementById('playGamesCard');
@@ -978,8 +986,18 @@ section[id^="tab-"].active{ display:block; }
         const el = document.createElement('div');
         el.className='ore';
         el.style.background=ore.bg;
-        const localX=ore.x-ORE_RADIUS;
-        const localY=ore.y-ORE_RADIUS;
+        let localX=ore.x-ORE_RADIUS;
+        let localY=ore.y-ORE_RADIUS;
+        const maxLeft = Math.max(0, gr.width - ORE_SIZE);
+        const maxTop = Math.max(0, gr.height - ORE_SIZE);
+        if(localX < 0 || localX > maxLeft){
+          localX = Math.min(Math.max(0, localX), maxLeft);
+          ore.x = localX + ORE_RADIUS;
+        }
+        if(localY < 0 || localY > maxTop){
+          localY = Math.min(Math.max(0, localY), maxTop);
+          ore.y = localY + ORE_RADIUS;
+        }
         el.style.transform=`translate(${localX}px, ${localY}px)`;
         el.dataset.idx=i;
         const hp=document.createElement('div');
