@@ -1,9 +1,9 @@
 // Active and passive skill definitions
 window.ACTIVE_SKILL_DATA = [
   { key:'berserk',  name:'광폭화',   desc:'5초간 공격력 x2',         ae:50,  cd:20 },
-  { key:'timewarp', name:'타임워프', desc:'시간 +3초(최대 20초)',    ae:120, cd:25 },
+  { key:'timewarp', name:'타임워프', desc:'시간 +3초',              ae:120, cd:20, autoToggleKey:'autoTimewarp', autoToggleLabel:'자동 사용' },
   { key:'meteor',   name:'운석 낙하', desc:'모든 광석에 큰 피해',    ae:200, cd:30 },
-  { key:'haste',    name:'가속',     desc:'5초간 생성 속도 2배',     ae:140, cd:25 },
+  { key:'haste',    name:'가속',     desc:'5초간 생성 속도 2배',     ae:140, cd:20, autoToggleKey:'autoHaste', autoToggleLabel:'자동 사용' },
   { key:'sonic',    name:'초음파',   desc:'가까운 광석에 즉시 큰 피해', ae:130, cd:18 },
 ];
 
@@ -53,7 +53,7 @@ window.PASSIVE_SKILL_DATA = [
   {
     key:'berserkAuto',
     name:'광폭화 자동 발동',
-    desc:'남은시간 5초 이하 시 광폭화 자동 발동 (토글 가능)',
+    desc:'남은시간 5초 이하 시 광폭화 자동 발동',
     ae:300,
     once:true,
     toggleKey:'berserkAutoEnabled',
