@@ -1333,6 +1333,12 @@ section[id^="tab-"].active{ display:block; }
 
     function floorHpMul(){ return 1 + 0.18*(state.floor-1); }
     function floorValMul(){ return 1 + 0.12*(state.floor-1); }
+    function etherHpForFloor(){
+      const baseHp = 2000;
+      const perFloor = 650;
+      const floorOffset = Math.max(0, state.floor - 1);
+      return Math.round(baseHp + perFloor * floorOffset);
+    }
 
     function startRun(){
       if(state.inRun) return;
@@ -1439,8 +1445,7 @@ section[id^="tab-"].active{ display:block; }
       function spawnEther(){
         const empties = state.grid.map((v,i)=> v? null : i).filter(v=>v!==null); if(empties.length===0) return;
         const idx = empties[Math.floor(Math.random()*empties.length)]; state.etherSpawned = true;
-        const baseE = 1250; const r = 0.06; const exp = Math.max(0, (state.floor-1)*(state.floor-1));
-        const hp = Math.round(baseE * Math.pow(1+r, exp));
+        const hp = etherHpForFloor();
         const gr = gridRect();
         const axisX = spawnAxisInfo(gr.width);
         const axisY = spawnAxisInfo(gr.height);
