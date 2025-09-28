@@ -17,7 +17,7 @@ window.spawnIntervalForLevel = spawnIntervalForLevel;
 
 const UPGRADE_CONFIG = {
   atk: {
-    defaultLevel: 1,
+    defaultLevel: 0,
     baseCost: 90,
     costScale: 0.45,
   },
@@ -48,7 +48,7 @@ window.UPGRADE_DEFAULTS = Object.fromEntries(
 );
 
 function previewAtk(state, level){
-  const lvl = Math.max(1, Math.floor(level));
+  const lvl = Math.max(0, Math.floor(level));
   const passiveData = window.PASSIVE_SKILL_DATA || [];
   const powerPassive = passiveData.find((sk) => sk.key === 'power');
   const maxPowerLevel = powerPassive && typeof powerPassive.maxLevel === 'number' ? powerPassive.maxLevel : 0;
@@ -58,8 +58,8 @@ function previewAtk(state, level){
   const base = Math.max(storedBase, baseFloor);
   const ATK_PER_LVL = 0.12;
   const ATK_MILE = 0.35;
-  const per = Math.pow(1 + ATK_PER_LVL, Math.max(0, lvl - 1));
-  const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, lvl - 1) / 10));
+  const per = Math.pow(1 + ATK_PER_LVL, Math.max(0, lvl));
+  const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, lvl) / 10));
   return Math.max(1, Math.ceil(base * per * bonus));
 }
 

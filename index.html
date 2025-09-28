@@ -447,6 +447,8 @@ section[id^="tab-"].active{ display:block; }
       ui(){ beep(430,0.05,'triangle',0.035); }
     };
 
+    const MAX_RUN_TIME = 20;
+
     // ---------- Game State ----------
     const state = {
       player: { atkBase: 10, atk: 10, critChanceBase: 0.10, critChance: 0.10, critMult: 2.0, gold: 0, ether: 0 },
@@ -480,6 +482,7 @@ section[id^="tab-"].active{ display:block; }
       skillsOwnedPassive: {},
       skillSlots: [null,null,null,null,null],
       skillCooldowns: {},
+      skillAuto: {},
       skillHasteUntil: 0,
       skillAtkBuffUntil: 0,
 
@@ -490,7 +493,9 @@ section[id^="tab-"].active{ display:block; }
       runFlags: { autoBerserkUsed:false },
 
       // Settings
-      settings: { autoSell:false }
+      settings: { autoSell:false },
+
+      lastTickReal: 0,
     };
 
     const AUTO_CHALLENGE_COST = 300;
@@ -503,12 +508,41 @@ section[id^="tab-"].active{ display:block; }
       if(typeof state.passive.berserkUnlimit !== 'boolean') state.passive.berserkUnlimit = false;
     }
 
+    function ensureSkillAutoDefaults(){
+      if(!state.skillAuto || typeof state.skillAuto !== 'object' || Array.isArray(state.skillAuto)){
+        state.skillAuto = {};
+      }
+      for(const sk of ACTIVE_SKILLS){
+        if(sk.autoToggleKey && typeof state.skillAuto[sk.autoToggleKey] !== 'boolean'){
+          state.skillAuto[sk.autoToggleKey] = false;
+        }
+      }
+    }
+
     function resetRunFlags(){
       state.runFlags = state.runFlags || {};
       state.runFlags.autoBerserkUsed = false;
     }
 
+    function clampRunTime(value){
+      if(!Number.isFinite(value)) return 0;
+      return Math.max(0, Math.min(MAX_RUN_TIME, Math.round(value * 10) / 10));
+    }
+
+    function setRunTime(value){
+      state.timeLeft = clampRunTime(value);
+    }
+
+    function addRunTime(amount){
+      setRunTime(state.timeLeft + amount);
+    }
+
+    function reduceRunTime(amount){
+      setRunTime(state.timeLeft - amount);
+    }
+
     ensurePassiveDefaults();
+    ensureSkillAutoDefaults();
     resetRunFlags();
 
     // ---------- Save/Load (stable key + migration) ----------
@@ -520,7 +554,7 @@ section[id^="tab-"].active{ display:block; }
         player: restPlayer,
         upgrades:state.upgrades, floor:state.floor, highestFloor:state.highestFloor,
         inventory:state.inventory, oreSales:state.oreSales, skillsOwnedActive:state.skillsOwnedActive, skillsOwnedPassive:state.skillsOwnedPassive,
-        skillSlots:state.skillSlots, passive:state.passive, aether:state.aether, settings:state.settings
+        skillSlots:state.skillSlots, passive:state.passive, aether:state.aether, settings:state.settings, skillAuto:state.skillAuto
       };
       try{ localStorage.setItem(SAVE_KEY, JSON.stringify(payload)); }catch(e){ console.warn('save failed', e); }
     }
@@ -555,6 +589,7 @@ section[id^="tab-"].active{ display:block; }
         state.skillSlots=s.skillSlots||[null,null,null,null,null];
         state.passive=s.passive||state.passive;
         state.aether = s.aether || state.aether;
+        state.skillAuto = s.skillAuto || state.skillAuto || {};
         if(state.aether){
           if(typeof state.aether.autoChallengeOwned !== 'boolean'){
             state.aether.autoChallengeOwned = !!state.aether.autoAdvanceOwned;
@@ -567,6 +602,7 @@ section[id^="tab-"].active{ display:block; }
         }
         state.settings = s.settings || state.settings;
         ensurePassiveDefaults();
+        ensureSkillAutoDefaults();
         resetRunFlags();
         if(typeof state.player.atkBase === 'undefined'){
           state.player.atkBase = (typeof s.player?.atk === 'number') ? s.player.atk : 10;
@@ -611,6 +647,21 @@ section[id^="tab-"].active{ display:block; }
       swingArc: Math.PI * 0.85,
       swingRadius: 28,
     };
+
+    const BASE_PET_STYLE = {
+      bg: '#22d3ee',
+      border: '#0e7490',
+      glow: 'rgba(34,211,238,0.6)',
+      damageMul: 1,
+    };
+
+    const SPECIAL_PET_STYLES = [
+      { bg:'#ef4444', border:'#b91c1c', glow:'rgba(248,113,113,0.8)' },
+      { bg:'#f97316', border:'#c2410c', glow:'rgba(251,146,60,0.8)' },
+      { bg:'#facc15', border:'#a16207', glow:'rgba(250,204,21,0.75)' },
+      { bg:'#22c55e', border:'#15803d', glow:'rgba(34,197,94,0.75)' },
+      { bg:'#3b82f6', border:'#1d4ed8', glow:'rgba(59,130,246,0.75)' },
+    ];
 
     const $ = sel => document.querySelector(sel);
     const gridEl = $('#grid');
@@ -984,7 +1035,7 @@ section[id^="tab-"].active{ display:block; }
     }
 
     function calcAtk() {
-      const L = state.upgrades.atk?.level || 1;
+      const L = Math.max(0, state.upgrades.atk?.level || 0);
       const powerPassive = PASSIVE_SKILLS.find((sk) => sk.key === 'power');
       const maxPowerLevel = powerPassive ? passiveMaxLevel(powerPassive) : 0;
       const ownedPower = Math.min(maxPowerLevel, state.skillsOwnedPassive?.power || 0);
@@ -994,8 +1045,8 @@ section[id^="tab-"].active{ display:block; }
       state.player.atkBase = base;
       const ATK_PER_LVL = 0.12;
       const ATK_MILE    = 0.35;
-      const per   = Math.pow(1 + ATK_PER_LVL, Math.max(0, L - 1));
-      const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, L - 1) / 10));
+      const per   = Math.pow(1 + ATK_PER_LVL, Math.max(0, L));
+      const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, L) / 10));
       const atk = Math.max(1, Math.ceil(base * per * bonus));
       state.player.atk = atk;
       calcCritChance();
@@ -1014,8 +1065,7 @@ section[id^="tab-"].active{ display:block; }
       $('#exitBtn').disabled = !state.inRun;
       $('#toggleRunBtn').textContent = state.inRun? '진행 중' : '던전 도전';
       $('#toggleRunBtn').disabled = state.inRun;
-      const max = 20;
-      const fill = state.inRun? Math.max(0, Math.min(1, state.timeLeft / max)) : 1;
+      const fill = state.inRun? Math.max(0, Math.min(1, state.timeLeft / MAX_RUN_TIME)) : 1;
       document.getElementById('timeFill').style.width = (fill*100)+'%';
       const isDungeonVisible = document.querySelector('#tab-dungeon').style.display !== 'none';
       document.body.classList.toggle('lock-v', isDungeonVisible);
@@ -1296,6 +1346,7 @@ section[id^="tab-"].active{ display:block; }
 
     function renderSkills(){
       ensurePassiveDefaults();
+      ensureSkillAutoDefaults();
       const slotsUpdated = syncSkillSlotsWithOwned();
       if(slotsUpdated){ save(); }
       const slotList = $('#slotList'); slotList.innerHTML='';
@@ -1384,8 +1435,43 @@ section[id^="tab-"].active{ display:block; }
         if(!owned){
           card.querySelector('.btn').addEventListener('click', ()=>{
             if(!spendAe(sk.ae)) { SFX.deny(); return; }
-            state.skillsOwnedActive[sk.key]=true; toast(`${sk.name} 획득!`); SFX.ui(); save(); renderSkills(); renderSkillBar(); renderTop();
+            state.skillsOwnedActive[sk.key]=true;
+            toast(`${sk.name} 획득!`);
+            SFX.ui();
+            save();
+            renderSkills();
+            renderSkillBar();
+            renderTop();
           });
+        }
+        if(sk.autoToggleKey){
+          const toggleRow = document.createElement('div');
+          toggleRow.className = 'row';
+          toggleRow.style.justifyContent = 'flex-end';
+          toggleRow.style.marginTop = '8px';
+          const label = document.createElement('label');
+          label.className = 'row';
+          label.style.alignItems = 'center';
+          label.style.gap = '6px';
+          const toggle = document.createElement('input');
+          toggle.type = 'checkbox';
+          toggle.style.width = '18px';
+          toggle.style.height = '18px';
+          toggle.checked = !!state.skillAuto[sk.autoToggleKey];
+          toggle.disabled = !owned;
+          toggle.addEventListener('change', ()=>{
+            if(!owned){ toggle.checked = false; return; }
+            state.skillAuto[sk.autoToggleKey] = !!toggle.checked;
+            save();
+            SFX.ui();
+            toast(`${sk.name} ${toggle.checked ? '자동 사용 ON' : '자동 사용 OFF'}`);
+          });
+          const span = document.createElement('span');
+          span.textContent = sk.autoToggleLabel || '자동 사용';
+          label.appendChild(toggle);
+          label.appendChild(span);
+          toggleRow.appendChild(label);
+          card.appendChild(toggleRow);
         }
         shopA.appendChild(card);
       }
@@ -1420,6 +1506,17 @@ section[id^="tab-"].active{ display:block; }
       return { success:true, unlimited, cd };
     }
 
+    const AUTO_TIMEWARP_THRESHOLD = 5;
+
+    const AUTO_SKILL_RULES = {
+      haste: {
+        shouldUse: (now) => state.skillHasteUntil <= now,
+      },
+      timewarp: {
+        shouldUse: () => state.timeLeft <= AUTO_TIMEWARP_THRESHOLD,
+      },
+    };
+
     function maybeHandleAutoBerserk(){
       if(!state.inRun) return;
       const autoLevel = state.skillsOwnedPassive?.berserkAuto || 0;
@@ -1433,6 +1530,23 @@ section[id^="tab-"].active{ display:block; }
       state.runFlags.autoBerserkUsed = true;
       SFX.skill();
       renderSkillBar(); renderGrid(); renderTop();
+    }
+
+    function maybeHandleAutoSkills(){
+      if(!state.inRun) return;
+      if(!state.skillAuto || typeof state.skillAuto !== 'object') return;
+      if(state.timeLeft <= 0) return;
+      const now = performance.now();
+      for(const sk of ACTIVE_SKILLS){
+        if(!sk.autoToggleKey) continue;
+        if(!state.skillAuto[sk.autoToggleKey]) continue;
+        if(!state.skillsOwnedActive?.[sk.key]) continue;
+        const cd = state.skillCooldowns[sk.key] || 0;
+        if(cd > 0.05) continue;
+        const rule = AUTO_SKILL_RULES[sk.key];
+        if(rule && typeof rule.shouldUse === 'function' && !rule.shouldUse(now)) continue;
+        useSkill(sk.key);
+      }
     }
 
     function useSkill(key){
@@ -1450,7 +1564,7 @@ section[id^="tab-"].active{ display:block; }
           SFX.skill();
           break;
         }
-        case 'timewarp': state.timeLeft = Math.min(20, +(state.timeLeft + 3).toFixed(1)); SFX.skill(); break;
+        case 'timewarp': addRunTime(3); SFX.skill(); break;
         case 'meteor':
           for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const dmg = Math.max(10, Math.floor(o.maxHp*0.35)); o.hp -= dmg; if(o.hp<=0){ onOreBroken(i, o); } }
           SFX.skill(); break;
@@ -1489,12 +1603,13 @@ section[id^="tab-"].active{ display:block; }
       state.skillAtkBuffUntil = 0;
       state.inRun = true;
       state.etherSpawned=false;
-      state.timeLeft = 20;
+      setRunTime(MAX_RUN_TIME);
       state.grid = new Array(25).fill(null);
       for(const o of ORES){ state.loot[o.key]=0; }
       Object.keys(state.skillCooldowns).forEach(k=> delete state.skillCooldowns[k]);
       restartSpawnTimer();
       state.runStartTs = performance.now();
+      state.lastTickReal = state.runStartTs;
       startTick();
       renderSkillBar();
       gridRectCache = null;
@@ -1504,17 +1619,24 @@ section[id^="tab-"].active{ display:block; }
 
     function startTick(){
       clearInterval(state.timers.tick);
+      state.lastTickReal = performance.now();
       state.timers.tick = setInterval(()=>{
         if(!state.inRun) return;
         const now = performance.now();
+        const delta = Math.max(0, (now - (state.lastTickReal || now)) / 1000);
+        state.lastTickReal = now;
         const elapsed = (now - state.runStartTs)/1000;
         const etherHasteLevel = state.aether?.etherHaste || 0;
         const etherDelay = 15 - (etherHasteLevel * 0.5);
         if(!state.etherSpawned && elapsed >= etherDelay){ spawnEther(); }
-        state.timeLeft = Math.max(0, +(state.timeLeft - 0.1).toFixed(1));
-        for(const k of Object.keys(state.skillCooldowns)){ state.skillCooldowns[k] = Math.max(0, state.skillCooldowns[k]-0.1); }
+        if(delta > 0){ reduceRunTime(delta); }
+        const cdKeys = Object.keys(state.skillCooldowns);
+        if(cdKeys.length){
+          for(const k of cdKeys){ state.skillCooldowns[k] = Math.max(0, state.skillCooldowns[k]-delta); }
+        }
         maybeHandleAutoBerserk();
-        if(state.timeLeft<=0){ bankAndExit(false); }
+        maybeHandleAutoSkills();
+        if(state.timeLeft<=0){ bankAndExit(false); return; }
         renderTop(); renderSkillBar();
       },100);
       state.lastAnimTs = performance.now(); requestAnimationFrame(petsFrame);
@@ -1549,6 +1671,7 @@ section[id^="tab-"].active{ display:block; }
       }
       for(const k in state.loot){ state.loot[k]=0; }
       state.inRun=false; clearInterval(state.timers.spawn); clearInterval(state.timers.tick);
+      setRunTime(0);
       state.pets=[]; state.lastAnimTs=0; state.grid = new Array(25).fill(null);
       if(cleared){ state.floor++; if(state.floor>state.highestFloor) state.highestFloor=state.floor; }
       save();
@@ -1569,7 +1692,7 @@ section[id^="tab-"].active{ display:block; }
       state.pets = [];
       state.lastAnimTs = 0;
       state.grid = new Array(25).fill(null);
-      state.timeLeft = 0;
+      setRunTime(0);
       renderSkillBar();
       gridRectCache = null;
       refresh();
@@ -1652,15 +1775,16 @@ section[id^="tab-"].active{ display:block; }
       }
       state.loot[ore.type] = (state.loot[ore.type]||0)+1;
       state.grid[idx] = null;
-      state.timeLeft = Math.min(20, +(state.timeLeft + 0.1).toFixed(1));
+      addRunTime(0.1);
       SFX.break();
       renderTop();
     }
 
-    function hit(idx, source='tap'){
+    function hit(idx, source='tap', opts={}){
       if(!state.inRun) return; const ore = state.grid[idx]; if(!ore) return;
       const atk = calcAtk();
-      let dmg = Math.round(atk * (state.skillAtkBuffUntil>performance.now()?2:1));
+      const dmgMul = Number.isFinite(opts?.damageMul) ? Math.max(0, opts.damageMul) : 1;
+      let dmg = Math.round(atk * (state.skillAtkBuffUntil>performance.now()?2:1) * dmgMul);
       const canCrit = (source === 'tap' || source === 'pet');
       const crit = canCrit && Math.random() < state.player.critChance;
       if(crit) dmg = Math.floor(dmg * state.player.critMult);
@@ -1690,45 +1814,74 @@ section[id^="tab-"].active{ display:block; }
 
     function spawnPets(){
       state.pets = [];
-      const count = (state.upgrades.pet.level || 0) + (state.passive.petPlus || 0) + (state.aether?.petPlus||0);
+      const baseCount = (state.upgrades.pet.level || 0) + (state.passive.petPlus || 0);
+      const specialCount = Math.max(0, state.aether?.petPlus || 0);
       const gr = gridRect();
       const width = Math.max(16, gr.width);
       const height = Math.max(16, gr.height);
-      for(let i=0;i<count;i++){
-        state.pets.push({
-          x: 8 + Math.random()*(width-16),
-          y: 8 + Math.random()*(height-16),
-          vx:0,
-          vy:0,
-          targetIdx:-1,
-          swinging:false,
-          swingTime:0,
-          swingBaseAngle:0,
-          swingDir:1,
-          swingArc:PET.swingArc,
-          swingRadius:PET.swingRadius,
-          swingDuration:PET.atkInterval,
-          wanderAngle: Math.random()*Math.PI*2,
-          wanderTimer: Math.random()*0.5,
-          wanderSpeed: 30 + Math.random()*20,
-          swingAxisX:0,
-          swingAxisY:0,
-          swingPerpX:0,
-          swingPerpY:0,
-          swingOriginX:0,
-          swingOriginY:0,
-          swingAmplitude:PET.swingRadius,
-          swingInertia:PET.swingRadius*0.5,
-          swingDriftAngle:0,
-          swingDriftStrength:0,
-          swingNoiseSeed:Math.random()*Math.PI*2,
-          swingStartOffsetX:0,
-          swingStartOffsetY:0,
-        });
+
+      const createPet = (style = BASE_PET_STYLE) => ({
+        x: 8 + Math.random() * (width - 16),
+        y: 8 + Math.random() * (height - 16),
+        vx:0,
+        vy:0,
+        targetIdx:-1,
+        swinging:false,
+        swingTime:0,
+        swingBaseAngle:0,
+        swingDir:1,
+        swingArc:PET.swingArc,
+        swingRadius:PET.swingRadius,
+        swingDuration:PET.atkInterval,
+        wanderAngle: Math.random()*Math.PI*2,
+        wanderTimer: Math.random()*0.5,
+        wanderSpeed: 30 + Math.random()*20,
+        swingAxisX:0,
+        swingAxisY:0,
+        swingPerpX:0,
+        swingPerpY:0,
+        swingOriginX:0,
+        swingOriginY:0,
+        swingAmplitude:PET.swingRadius,
+        swingInertia:PET.swingRadius*0.5,
+        swingDriftAngle:0,
+        swingDriftStrength:0,
+        swingNoiseSeed:Math.random()*Math.PI*2,
+        swingStartOffsetX:0,
+        swingStartOffsetY:0,
+        damageMul: Number.isFinite(style.damageMul) ? style.damageMul : 1,
+        color: style.bg || BASE_PET_STYLE.bg,
+        borderColor: style.border || BASE_PET_STYLE.border,
+        glow: style.glow || BASE_PET_STYLE.glow,
+        special: !!style.special,
+        styleIndex: typeof style.styleIndex === 'number' ? style.styleIndex : null,
+      });
+
+      for(let i=0;i<baseCount;i++){
+        state.pets.push(createPet(BASE_PET_STYLE));
+      }
+      for(let i=0;i<specialCount;i++){
+        const styleDef = SPECIAL_PET_STYLES[i % SPECIAL_PET_STYLES.length] || {};
+        state.pets.push(createPet({ ...styleDef, damageMul: 2, special: true, styleIndex: i }));
       }
       renderPets();
     }
-    function renderPets(){ gridEl.querySelectorAll('.pet').forEach(p=>p.remove()); gridRect(); for(const p of state.pets){ const el=document.createElement('div'); el.className='pet'; const localX = p.x - 8; const localY = p.y - 8; el.style.transform = `translate(${localX}px, ${localY}px)`; gridEl.appendChild(el); } }
+    function renderPets(){
+      gridEl.querySelectorAll('.pet').forEach(p=>p.remove());
+      gridRect();
+      for(const p of state.pets){
+        const el=document.createElement('div');
+        el.className='pet';
+        if(p.special) el.classList.add('pet-special');
+        const localX = p.x - 8;
+        const localY = p.y - 8;
+        el.style.transform = `translate(${localX}px, ${localY}px)`;
+        if(p.color) el.style.background = p.color;
+        if(p.borderColor) el.style.borderColor = p.borderColor;
+        if(p.glow) el.style.boxShadow = `0 0 10px ${p.glow}`;
+        gridEl.appendChild(el);
+      }
+    }
     function findNearestOreIdx(x,y){ let best=-1, bestD=1e9; for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const d=Math.hypot(ore.x-x, ore.y-y); if(d<bestD){ bestD=d; best=i; } } return best; }
     function findNearestOreFromList(x,y,indices){
       let best=-1, bestD=1e9;
@@ -1836,7 +1989,7 @@ section[id^="tab-"].active{ display:block; }
       if(!p.swinging || !ore) return false;
       if(!p.swingInitialDamageDone){
         p.swingInitialDamageDone = true;
-        hit(p.targetIdx,'pet');
+        hit(p.targetIdx,'pet',{ damageMul: p.damageMul || 1 });
         const currentOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
         if(!currentOre){
           p.swinging = false;
@@ -1878,7 +2031,7 @@ section[id^="tab-"].active{ display:block; }
         const dtSafe = Math.max(dt, 0.016);
         p.vx = (p.x - prevX) / dtSafe * 0.6;
         p.vy = (p.y - prevY) / dtSafe * 0.6;
-        hit(p.targetIdx,'pet');
+        hit(p.targetIdx,'pet',{ damageMul: p.damageMul || 1 });
         const nextOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
         if(nextOre){
           configurePetSwing(p, nextOre, true, p.vx, p.vy, false);
