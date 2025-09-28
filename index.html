@@ -594,6 +594,23 @@ section[id^="tab-"].active{ display:block; }
       return { start, span };
     }
 
+    function clampAxisValue(val, axis){
+      if(!axis) return val;
+      const start = Number.isFinite(axis.start) ? axis.start : 0;
+      const span = Math.max(0, Number.isFinite(axis.span) ? axis.span : 0);
+      const min = start;
+      const max = start + span;
+      if(!Number.isFinite(val)) return start;
+      if(max <= min) return min;
+      return Math.min(max, Math.max(min, val));
+    }
+
+    function clampOreToGrid(ore, axisX, axisY){
+      if(!ore) return;
+      ore.x = clampAxisValue(ore.x, axisX);
+      ore.y = clampAxisValue(ore.y, axisY);
+    }
+
     const playGamesCardEl = document.getElementById('playGamesCard');
     const playGamesStatusEl = document.getElementById('playGamesStatus');
     const playGamesLoginBtn = document.getElementById('playGamesLoginBtn');
@@ -825,6 +842,7 @@ section[id^="tab-"].active{ display:block; }
               const ny = Math.max(0, Math.min(1, (ore.y - oldAxisY.start) / oldInnerH));
               ore.x = newAxisX.start + nx * (newAxisX.span || 0);
               ore.y = newAxisY.start + ny * (newAxisY.span || 0);
+              clampOreToGrid(ore, newAxisX, newAxisY);
             }
             const oldPetW = Math.max(1, prev.width - 16);
             const oldPetH = Math.max(1, prev.height - 16);
@@ -949,8 +967,31 @@ section[id^="tab-"].active{ display:block; }
       document.body.classList.toggle('lock-v', isDungeonVisible);
     }
 
-    function renderGrid(){ gridEl.innerHTML=''; gridRect();
-      for(let i=0;i<25;i++){ const ore=state.grid[i]; if(!ore) continue; const el=document.createElement('div'); el.className='ore'; el.style.background=ore.bg; const localX=ore.x-ORE_RADIUS; const localY=ore.y-ORE_RADIUS; el.style.transform=`translate(${localX}px, ${localY}px)`; el.dataset.idx=i; const hp=document.createElement('div'); hp.className='hp'; const f=document.createElement('div'); hp.appendChild(f); const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp)); f.style.width=(ratio*100)+'%'; el.appendChild(hp); gridEl.appendChild(el); ore.el = el; }
+    function renderGrid(){ gridEl.innerHTML='';
+      const gr = gridRect();
+      const axisX = spawnAxisInfo(gr.width);
+      const axisY = spawnAxisInfo(gr.height);
+      for(let i=0;i<25;i++){
+        const ore = state.grid[i];
+        if(!ore) continue;
+        clampOreToGrid(ore, axisX, axisY);
+        const el = document.createElement('div');
+        el.className='ore';
+        el.style.background=ore.bg;
+        const localX=ore.x-ORE_RADIUS;
+        const localY=ore.y-ORE_RADIUS;
+        el.style.transform=`translate(${localX}px, ${localY}px)`;
+        el.dataset.idx=i;
+        const hp=document.createElement('div');
+        hp.className='hp';
+        const f=document.createElement('div');
+        hp.appendChild(f);
+        const ratio=Math.max(0,Math.min(1,ore.hp/ore.maxHp));
+        f.style.width=(ratio*100)+'%';
+        el.appendChild(hp);
+        gridEl.appendChild(el);
+        ore.el = el;
+      }
       renderPets(); }
 
     function renderInventory(){ const box=$('#inventoryList'); box.innerHTML='';
@@ -1358,9 +1399,18 @@ section[id^="tab-"].active{ display:block; }
       const gr = gridRect();
       const axisX = spawnAxisInfo(gr.width);
       const axisY = spawnAxisInfo(gr.height);
-      const x = axisX.start + (axisX.span>0 ? Math.random()*axisX.span : 0);
-      const y = axisY.start + (axisY.span>0 ? Math.random()*axisY.span : 0);
-      state.grid[idx] = { type: base.key, label: base.name, hp, maxHp: hp, value, bg: base.color, x, y };
+      const ore = {
+        type: base.key,
+        label: base.name,
+        hp,
+        maxHp: hp,
+        value,
+        bg: base.color,
+        x: axisX.start + (axisX.span>0 ? Math.random()*axisX.span : 0),
+        y: axisY.start + (axisY.span>0 ? Math.random()*axisY.span : 0)
+      };
+      clampOreToGrid(ore, axisX, axisY);
+      state.grid[idx] = ore;
       renderGrid();
     }
 
@@ -1372,9 +1422,18 @@ section[id^="tab-"].active{ display:block; }
         const gr = gridRect();
         const axisX = spawnAxisInfo(gr.width);
         const axisY = spawnAxisInfo(gr.height);
-        const x = axisX.start + (axisX.span>0 ? Math.random()*axisX.span : 0);
-        const y = axisY.start + (axisY.span>0 ? Math.random()*axisY.span : 0);
-        state.grid[idx] = { type:'EtherOre', label:'에테르 광석', hp, maxHp: hp, value: 0, bg:'#a855f7', x, y }; renderGrid(); }
+        const ore = {
+          type:'EtherOre',
+          label:'에테르 광석',
+          hp,
+          maxHp: hp,
+          value: 0,
+          bg:'#a855f7',
+          x: axisX.start + (axisX.span>0 ? Math.random()*axisX.span : 0),
+          y: axisY.start + (axisY.span>0 ? Math.random()*axisY.span : 0)
+        };
+        clampOreToGrid(ore, axisX, axisY);
+        state.grid[idx] = ore; renderGrid(); }
 
     function onOreBroken(idx, ore){
       if(ore.type==='EtherOre'){ state.player.ether += 10; toast('✨ 에테르 +10'); state.grid[idx] = null; SFX.break(); bankAndExit(true); return; }
