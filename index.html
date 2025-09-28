@@ -673,19 +673,52 @@ section[id^="tab-"].active{ display:block; }
     let aeGainFlashTimer = null;
     let gridRectCache = null;
     let lastGridRectValid = null;
+    let gridSafeMargin = { x: 6, y: 6 };
 
     const ORE_SIZE = 52;
     const ORE_RADIUS = ORE_SIZE / 2;
     const GRID_SAFE_MARGIN = 6;
 
-    function spawnAxisInfo(size){
+    function parseCssPx(v){
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function computeGridSafeMargins(){
+      if(!gridEl) return gridSafeMargin;
+      try{
+        const style = window.getComputedStyle(gridEl);
+        const padLeft = parseCssPx(style.paddingLeft);
+        const padRight = parseCssPx(style.paddingRight);
+        const padTop = parseCssPx(style.paddingTop);
+        const padBottom = parseCssPx(style.paddingBottom);
+        const radiusTL = parseCssPx(style.borderTopLeftRadius);
+        const radiusTR = parseCssPx(style.borderTopRightRadius);
+        const radiusBL = parseCssPx(style.borderBottomLeftRadius);
+        const radiusBR = parseCssPx(style.borderBottomRightRadius);
+        const safeX = Math.max(GRID_SAFE_MARGIN, padLeft, padRight, radiusTL, radiusTR, radiusBL, radiusBR);
+        const safeY = Math.max(GRID_SAFE_MARGIN, padTop, padBottom, radiusTL, radiusTR, radiusBL, radiusBR);
+        gridSafeMargin = { x: safeX, y: safeY };
+      }catch(e){ gridSafeMargin = { x: GRID_SAFE_MARGIN, y: GRID_SAFE_MARGIN }; }
+      return gridSafeMargin;
+    }
+
+    function currentGridMargins(){
+      if(gridRectCache && Number.isFinite(gridRectCache.marginX) && Number.isFinite(gridRectCache.marginY)){
+        return { x: gridRectCache.marginX, y: gridRectCache.marginY };
+      }
+      return computeGridSafeMargins();
+    }
+
+    function spawnAxisInfo(size, desiredMargin = GRID_SAFE_MARGIN){
       const actual = Math.max(0, size || 0);
+      const desired = Math.max(0, Number.isFinite(desiredMargin) ? desiredMargin : GRID_SAFE_MARGIN);
       const available = Math.max(0, actual - ORE_SIZE);
-      const margin = Math.min(GRID_SAFE_MARGIN, available / 2);
+      const margin = Math.min(desired, available / 2);
       const minCenter = ORE_RADIUS + margin;
       const maxCenter = Math.max(minCenter, actual - (ORE_RADIUS + margin));
       const span = Math.max(0, maxCenter - minCenter);
-      return { start: minCenter, span, min: minCenter, max: maxCenter, size: actual };
+      return { start: minCenter, span, min: minCenter, max: maxCenter, size: actual, margin };
     }
 
     function clampAxisValue(val, axis){
@@ -706,8 +739,8 @@ section[id^="tab-"].active{ display:block; }
       const gridHeight = axisY?.size ?? gridRectCache?.height ?? lastGridRectValid?.height ?? ORE_SIZE;
       const availableX = Math.max(0, gridWidth - ORE_SIZE);
       const availableY = Math.max(0, gridHeight - ORE_SIZE);
-      const marginX = Math.min(GRID_SAFE_MARGIN, availableX / 2);
-      const marginY = Math.min(GRID_SAFE_MARGIN, availableY / 2);
+      const marginX = Number.isFinite(axisX?.margin) ? axisX.margin : Math.min(GRID_SAFE_MARGIN, availableX / 2);
+      const marginY = Number.isFinite(axisY?.margin) ? axisY.margin : Math.min(GRID_SAFE_MARGIN, availableY / 2);
       const minCenterX = ORE_RADIUS + marginX;
       const maxCenterX = Math.max(minCenterX, gridWidth - (ORE_RADIUS + marginX));
       const minCenterY = ORE_RADIUS + marginY;
@@ -929,15 +962,18 @@ section[id^="tab-"].active{ display:block; }
       const r = gridEl.getBoundingClientRect();
       const hasSize = (r.width || 0) > 0 && (r.height || 0) > 0;
       if(hasSize){
+        const newMargins = computeGridSafeMargins();
         if(gridRectCache){
           const widthChanged = Math.abs(gridRectCache.width - r.width) > 0.5;
           const heightChanged = Math.abs(gridRectCache.height - r.height) > 0.5;
           if(widthChanged || heightChanged){
             const prev = gridRectCache;
-            const oldAxisX = spawnAxisInfo(prev.width);
-            const oldAxisY = spawnAxisInfo(prev.height);
-            const newAxisX = spawnAxisInfo(r.width);
-            const newAxisY = spawnAxisInfo(r.height);
+            const prevMarginX = Number.isFinite(prev.marginX) ? prev.marginX : newMargins.x;
+            const prevMarginY = Number.isFinite(prev.marginY) ? prev.marginY : newMargins.y;
+            const oldAxisX = spawnAxisInfo(prev.width, prevMarginX);
+            const oldAxisY = spawnAxisInfo(prev.height, prevMarginY);
+            const newAxisX = spawnAxisInfo(r.width, newMargins.x);
+            const newAxisY = spawnAxisInfo(r.height, newMargins.y);
             const oldInnerW = Math.max(1, oldAxisX.span || 0);
             const oldInnerH = Math.max(1, oldAxisY.span || 0);
             for(let i=0;i<state.grid.length;i++){
@@ -961,18 +997,43 @@ section[id^="tab-"].active{ display:block; }
             }
           }
         }
-        gridRectCache = {left:r.left, top:r.top, width:r.width, height:r.height, right:r.right, bottom:r.bottom};
+        gridRectCache = {
+          left:r.left,
+          top:r.top,
+          width:r.width,
+          height:r.height,
+          right:r.right,
+          bottom:r.bottom,
+          marginX:newMargins.x,
+          marginY:newMargins.y
+        };
         lastGridRectValid = gridRectCache;
         return gridRectCache;
       }
       if(lastGridRectValid){
         gridRectCache = lastGridRectValid;
+        if(Number.isFinite(gridRectCache.marginX) && Number.isFinite(gridRectCache.marginY)){
+          gridSafeMargin = { x: gridRectCache.marginX, y: gridRectCache.marginY };
+        }
         return gridRectCache;
       }
       if(gridRectCache){
+        if(Number.isFinite(gridRectCache.marginX) && Number.isFinite(gridRectCache.marginY)){
+          gridSafeMargin = { x: gridRectCache.marginX, y: gridRectCache.marginY };
+        }
         return gridRectCache;
       }
-      gridRectCache = {left:r.left, top:r.top, width:ORE_SIZE, height:ORE_SIZE, right:r.left + ORE_SIZE, bottom:r.top + ORE_SIZE};
+      const fallbackMargins = computeGridSafeMargins();
+      gridRectCache = {
+        left:r.left,
+        top:r.top,
+        width:ORE_SIZE,
+        height:ORE_SIZE,
+        right:r.left + ORE_SIZE,
+        bottom:r.top + ORE_SIZE,
+        marginX:fallbackMargins.x,
+        marginY:fallbackMargins.y
+      };
       return gridRectCache;
     }
     function cellCenter(idx){ const o = state.grid[idx]; return { x:o.x, y:o.y }; }
@@ -1075,8 +1136,9 @@ section[id^="tab-"].active{ display:block; }
 
     function renderGrid(){ gridEl.innerHTML='';
       const gr = gridRect();
-      const axisX = spawnAxisInfo(gr.width);
-      const axisY = spawnAxisInfo(gr.height);
+      const margins = currentGridMargins();
+      const axisX = spawnAxisInfo(gr.width, margins.x);
+      const axisY = spawnAxisInfo(gr.height, margins.y);
       for(let i=0;i<25;i++){
         const ore = state.grid[i];
         if(!ore) continue;
@@ -1814,8 +1876,9 @@ section[id^="tab-"].active{ display:block; }
       const hp = Math.round(base.hp*floorHpMul()*growth*(state.skillAtkBuffUntil>performance.now()?0.9:1));
       const value = Math.round(base.value*floorValMul());
       const gr = gridRect();
-      const axisX = spawnAxisInfo(gr.width);
-      const axisY = spawnAxisInfo(gr.height);
+      const margins = currentGridMargins();
+      const axisX = spawnAxisInfo(gr.width, margins.x);
+      const axisY = spawnAxisInfo(gr.height, margins.y);
       const ore = {
         type: base.key,
         label: base.name,
@@ -1836,8 +1899,9 @@ section[id^="tab-"].active{ display:block; }
         const idx = empties[Math.floor(Math.random()*empties.length)]; state.etherSpawned = true;
         const hp = etherHpForFloor();
         const gr = gridRect();
-        const axisX = spawnAxisInfo(gr.width);
-        const axisY = spawnAxisInfo(gr.height);
+        const margins = currentGridMargins();
+        const axisX = spawnAxisInfo(gr.width, margins.x);
+        const axisY = spawnAxisInfo(gr.height, margins.y);
         const ore = {
           type:'EtherOre',
           label:'에테르 광석',
