@@ -1891,8 +1891,13 @@ section[id^="tab-"].active{ display:block; }
         swingDriftAngle:0,
         swingDriftStrength:0,
         swingNoiseSeed:Math.random()*Math.PI*2,
+        swingNoiseScale:0,
         swingStartOffsetX:0,
         swingStartOffsetY:0,
+        strafeDir:0,
+        strafeTimer:0,
+        engageState:'idle',
+        id:-1,
         damageMul: Number.isFinite(style.damageMul) ? style.damageMul : 1,
         color: style.bg || BASE_PET_STYLE.bg,
         borderColor: style.border || BASE_PET_STYLE.border,
@@ -1901,12 +1906,24 @@ section[id^="tab-"].active{ display:block; }
         styleIndex: typeof style.styleIndex === 'number' ? style.styleIndex : null,
       });
 
+      const initPetMotion = (pet) => {
+        pet.id = state.pets.length;
+        if(!Number.isFinite(pet.strafeDir) || pet.strafeDir === 0){
+          pet.strafeDir = pet.id % 2 === 0 ? 1 : -1;
+        } else {
+          pet.strafeDir = pet.strafeDir >= 0 ? 1 : -1;
+        }
+        pet.strafeTimer = 0;
+        pet.engageState = 'idle';
+        return pet;
+      };
+
       for(let i=0;i<baseCount;i++){
-        state.pets.push(createPet(BASE_PET_STYLE));
+        state.pets.push(initPetMotion(createPet(BASE_PET_STYLE)));
       }
       for(let i=0;i<specialCount;i++){
         const styleDef = SPECIAL_PET_STYLES[i % SPECIAL_PET_STYLES.length] || {};
-        state.pets.push(createPet({ ...styleDef, damageMul: 2, special: true, styleIndex: i }));
+        state.pets.push(initPetMotion(createPet({ ...styleDef, damageMul: 2, special: true, styleIndex: i })));
       }
       renderPets();
     }
@@ -1979,8 +1996,13 @@ section[id^="tab-"].active{ display:block; }
         p.swingCycleStage = 0;
         p.swingOrientationAngle = null;
       }
+      if(!Number.isFinite(p.strafeDir) || p.strafeDir === 0){
+        p.strafeDir = (p.id || 0) % 2 === 0 ? 1 : -1;
+      } else {
+        p.strafeDir = p.strafeDir >= 0 ? 1 : -1;
+      }
       if(!Number.isFinite(p.swingTurnDir) || !reuseCycle){
-        p.swingTurnDir = Math.random() < 0.5 ? -1 : 1;
+        p.swingTurnDir = p.strafeDir;
       }
       if(!Number.isFinite(p.swingCycleStage)) p.swingCycleStage = 0;
       let orientationAngle;
@@ -2018,10 +2040,12 @@ section[id^="tab-"].active{ display:block; }
       p.swingAmplitude = amplitude;
       p.swingInertia = inertia;
       p.swingDuration = PET.atkInterval;
-      const driftBias = (p.swingTurnDir || 1) * (p.swingCycleStage >= 2 ? 0.4 : 0.25);
+      const strafeDir = p.strafeDir || p.swingTurnDir || 1;
+      const driftBias = strafeDir * (p.swingCycleStage >= 2 ? 0.32 : 0.2);
       p.swingDriftAngle = orientationAngle + driftBias;
-      p.swingDriftStrength = amplitude * (p.swingCycleStage >= 2 ? 0.45 : 0.3);
+      p.swingDriftStrength = amplitude * (p.swingCycleStage >= 2 ? 0.38 : 0.24);
       p.swingNoiseSeed = Math.random()*Math.PI;
+      p.swingNoiseScale = p.swingCycleStage >= 2 ? 0.08 : 0;
       p.swingStartOffsetX = p.x - ore.x;
       p.swingStartOffsetY = p.y - ore.y;
       p.swingInitialDamageDone = !immediateStrike;
@@ -2069,7 +2093,8 @@ section[id^="tab-"].active{ display:block; }
       const driftProgress = tRaw * tRaw;
       const driftX = Math.cos(driftAngle) * driftStrength * driftProgress;
       const driftY = Math.sin(driftAngle) * driftStrength * driftProgress;
-      const noise = Math.sin(tRaw * Math.PI * 4 + (p.swingNoiseSeed||0)) * 2 * tRaw;
+      const noiseScale = Number.isFinite(p.swingNoiseScale) ? p.swingNoiseScale : 1;
+      const noise = Math.sin(tRaw * Math.PI * 4 + (p.swingNoiseSeed||0)) * 2 * tRaw * noiseScale;
       const originX = Number.isFinite(p.swingOriginX) ? p.swingOriginX : ore.x;
       const originY = Number.isFinite(p.swingOriginY) ? p.swingOriginY : ore.y;
       const amplitude = p.swingAmplitude || PET.swingRadius;
@@ -2149,31 +2174,53 @@ section[id^="tab-"].active{ display:block; }
           p.targetIdx = newIdx;
           if(newIdx >= 0){
             oreTargetClaims.set(newIdx, (oreTargetClaims.get(newIdx)||0)+1);
+            p.engageState = 'approach';
+          } else {
+            p.engageState = 'idle';
           }
+          p.strafeTimer = 0;
         }
         const ore = p.targetIdx>=0 ? state.grid[p.targetIdx] : null;
         if(ore){
           const dx = ore.x - p.x;
           const dy = ore.y - p.y;
           const dist = Math.hypot(dx,dy) || 1;
-          const speed = dist<36 ? PET.moveSpeed*(dist/36) : PET.moveSpeed;
-          const desiredVX = (dx/dist)*speed;
-          const desiredVY = (dy/dist)*speed;
-          p.vx += (desiredVX - p.vx) * 0.08;
-          p.vy += (desiredVY - p.vy) * 0.08;
-          p.wanderTimer = (p.wanderTimer || 0) - dt;
-          if(p.wanderTimer <= 0){
-            p.wanderTimer = 0.35 + Math.random()*0.45;
-            p.wanderAngle = Math.random()*Math.PI*2;
-            p.wanderSpeed = 35 + Math.random()*45;
+          const axisX = dx / dist;
+          const axisY = dy / dist;
+          const targetRadius = PET.swingRadius * 0.65;
+          if(dist > PET.swingRadius * 0.85){
+            p.engageState = 'approach';
+            p.strafeTimer = 0;
+            const approachSpeed = PET.moveSpeed;
+            const desiredVX = axisX * approachSpeed;
+            const desiredVY = axisY * approachSpeed;
+            p.vx += (desiredVX - p.vx) * 0.18;
+            p.vy += (desiredVY - p.vy) * 0.18;
+          } else {
+            if(p.engageState !== 'strafe'){
+              p.strafeTimer = 0;
+            }
+            p.engageState = 'strafe';
+            p.strafeTimer = (p.strafeTimer || 0) + dt;
+            if(p.strafeTimer > 10) p.strafeTimer -= 10;
+            if(!Number.isFinite(p.strafeDir) || p.strafeDir === 0){
+              p.strafeDir = (p.swingTurnDir || 1) >= 0 ? 1 : -1;
+            }
+            const strafeDir = p.strafeDir >= 0 ? 1 : -1;
+            const perpX = -axisY;
+            const perpY = axisX;
+            const strafeSpeed = PET.moveSpeed * 0.55;
+            const radialError = dist - targetRadius;
+            const radialCorrection = Math.max(-PET.moveSpeed * 0.6, Math.min(PET.moveSpeed * 0.6, -radialError * 4));
+            const forwardOsc = Math.sin(p.strafeTimer * Math.PI * 2) * PET.moveSpeed * 0.2;
+            const desiredVX = perpX * strafeSpeed * strafeDir + axisX * (forwardOsc + radialCorrection);
+            const desiredVY = perpY * strafeSpeed * strafeDir + axisY * (forwardOsc + radialCorrection);
+            p.vx += (desiredVX - p.vx) * 0.2;
+            p.vy += (desiredVY - p.vy) * 0.2;
           }
-          const wanderSpeed = p.wanderSpeed || 0;
-          const wanderAngle = p.wanderAngle || 0;
-          p.vx += Math.cos(wanderAngle) * wanderSpeed * dt * 0.6;
-          p.vy += Math.sin(wanderAngle) * wanderSpeed * dt * 0.6;
-          p.vx += (Math.random()-0.5) * 10 * dt;
-          p.vy += (Math.random()-0.5) * 10 * dt;
         } else {
+          p.engageState = 'idle';
+          p.strafeTimer = 0;
           p.wanderTimer = (p.wanderTimer || 0) - dt;
           if(p.wanderTimer <= 0){
             p.wanderTimer = 0.6 + Math.random()*0.6;
@@ -2215,6 +2262,8 @@ section[id^="tab-"].active{ display:block; }
         p.y = Math.max(8, Math.min(gr.height-8, p.y));
         if(!ore){
           p.targetIdx = -1;
+          p.engageState = 'idle';
+          p.strafeTimer = 0;
           continue;
         }
         const dist = Math.hypot(ore.x - p.x, ore.y - p.y);
