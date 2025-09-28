@@ -1974,33 +1974,41 @@ section[id^="tab-"].active{ display:block; }
       const dx = ore.x - p.x;
       const dy = ore.y - p.y;
       const dist = Math.hypot(dx, dy) || 1;
-      const towardOre = Math.atan2(dy, dx);
       const approachMag = Math.hypot(approachVX, approachVY);
-      let travelAngle;
-      if(reuseCycle && Number.isFinite(p.lastApproachAngle)){
-        travelAngle = p.lastApproachAngle + (Math.random()*0.15 - 0.075);
-      } else if(approachMag > 1){
-        travelAngle = Math.atan2(approachVY, approachVX);
-      } else if(Number.isFinite(p.lastApproachAngle)){
-        travelAngle = p.lastApproachAngle;
-      } else {
-        travelAngle = towardOre;
+      if(!reuseCycle){
+        p.swingCycleStage = 0;
+        p.swingOrientationAngle = null;
       }
-      const axisX = Math.cos(travelAngle);
-      const axisY = Math.sin(travelAngle);
-      const lateralJitter = (Math.random()*0.5 - 0.25);
-      const perpAngle = travelAngle + Math.PI/2 + lateralJitter;
-      const perpX = Math.cos(perpAngle);
-      const perpY = Math.sin(perpAngle);
-      const swingDir = reuseCycle && p.swingDir ? -p.swingDir : (Math.random() < 0.5 ? -1 : 1);
+      if(!Number.isFinite(p.swingTurnDir) || !reuseCycle){
+        p.swingTurnDir = Math.random() < 0.5 ? -1 : 1;
+      }
+      if(!Number.isFinite(p.swingCycleStage)) p.swingCycleStage = 0;
+      let orientationAngle;
+      if(p.swingCycleStage === 0){
+        orientationAngle = -Math.PI/2;
+        p.swingCycleStage = 1;
+      } else if(p.swingCycleStage === 1){
+        orientationAngle = -Math.PI/2 + (p.swingTurnDir||1) * (Math.PI/2);
+        p.swingCycleStage = 2;
+      } else {
+        const fallback = -Math.PI/2 + (p.swingTurnDir||1) * (Math.PI/2);
+        orientationAngle = Number.isFinite(p.swingOrientationAngle) ? p.swingOrientationAngle : fallback;
+      }
+      p.swingOrientationAngle = orientationAngle;
+      const axisX = Math.cos(orientationAngle);
+      const axisY = Math.sin(orientationAngle);
+      const perpX = -axisY;
+      const perpY = axisX;
+      const alongAxis = (p.x - ore.x) * axisX + (p.y - ore.y) * axisY;
+      const swingDir = reuseCycle && p.swingDir ? -p.swingDir : (alongAxis >= 0 ? -1 : 1);
       const reach = Math.max(ORE_RADIUS + 6, dist + Math.min(approachMag * 0.6, PET.swingRadius * 0.4));
-      const amplitude = Math.min(PET.swingRadius * (0.9 + Math.random()*0.35), reach);
-      const inertiaBase = amplitude * (0.38 + Math.random()*0.32);
-      const inertia = Math.min(PET.swingRadius * 1.25, inertiaBase + approachMag * 0.9);
+      const amplitude = Math.min(PET.swingRadius * 1.05, reach);
+      const inertiaBase = amplitude * (p.swingCycleStage >= 2 ? 0.55 : 0.42);
+      const inertia = Math.min(PET.swingRadius * 1.25, inertiaBase + approachMag * 0.85);
       p.swinging = true;
       p.swingTime = 0;
       p.swingDir = swingDir;
-      p.swingBaseAngle = travelAngle;
+      p.swingBaseAngle = orientationAngle;
       p.swingAxisX = axisX;
       p.swingAxisY = axisY;
       p.swingPerpX = perpX;
@@ -2010,13 +2018,14 @@ section[id^="tab-"].active{ display:block; }
       p.swingAmplitude = amplitude;
       p.swingInertia = inertia;
       p.swingDuration = PET.atkInterval;
-      p.swingDriftAngle = travelAngle + (Math.random()*0.6 - 0.3);
-      p.swingDriftStrength = (6 + Math.random()*12) * (amplitude / PET.swingRadius);
-      p.swingNoiseSeed = Math.random()*Math.PI*2;
+      const driftBias = (p.swingTurnDir || 1) * (p.swingCycleStage >= 2 ? 0.4 : 0.25);
+      p.swingDriftAngle = orientationAngle + driftBias;
+      p.swingDriftStrength = amplitude * (p.swingCycleStage >= 2 ? 0.45 : 0.3);
+      p.swingNoiseSeed = Math.random()*Math.PI;
       p.swingStartOffsetX = p.x - ore.x;
       p.swingStartOffsetY = p.y - ore.y;
       p.swingInitialDamageDone = !immediateStrike;
-      p.lastApproachAngle = travelAngle;
+      p.lastApproachAngle = orientationAngle;
       p.lastApproachSpeed = approachMag;
       p.lastApproachVX = approachMag > 0 ? axisX * approachMag : approachVX;
       p.lastApproachVY = approachMag > 0 ? axisY * approachMag : approachVY;
