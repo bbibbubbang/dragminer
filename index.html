@@ -63,7 +63,15 @@
     .skill-card{background:#0f1430;border:1px solid #273061;border-radius:12px;padding:10px}
     .skill-card.owned-active{opacity:0.45}
     .skillbar{position:sticky;bottom:0;margin-top:8px;background:#0e1328;border:1px solid #1f2853;border-radius:12px;padding:6px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-    .skillbtn{height:44px;border-radius:10px;border:1px solid #30407a;background:#18224a;color:#dbe7ff;font-weight:800;touch-action:manipulation}
+    @property --skill-ring-angle{syntax:'<angle>';inherits:false;initial-value:0deg}
+    @keyframes skill-ring-spin{to{--skill-ring-angle:-360deg}}
+
+    .skillbtn{height:44px;border-radius:10px;border:1px solid #30407a;background:#18224a;color:#dbe7ff;font-weight:800;touch-action:manipulation;position:relative;overflow:hidden}
+    .skillbtn.duration-active{border:2px solid transparent;background:
+      linear-gradient(#18224a,#18224a) padding-box,
+      conic-gradient(from var(--skill-ring-angle), #f97316 0deg, #facc15 72deg, #22d3ee 144deg, #a855f7 216deg, #f472b6 288deg, #f97316 360deg) border-box;
+      animation:skill-ring-spin 2.4s linear infinite;
+    }
     .skillbtn.cd{position:relative}
     .skillbtn.cd::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.35);}
     .slotlist{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
@@ -540,7 +548,7 @@ section[id^="tab-"].active{ display:block; }
       passive: { sellBonus: 0, petPlus: 0, berserkUnlimit:false },
 
       // Run-time flags
-      runFlags: { berserkBoostActive:false, berserkBoostPrevExpiry:null },
+      runFlags: { berserkBoostActive:false, berserkBoostPrevExpiry:null, hasteActive:false },
 
       // Settings
       settings: { autoSell:false },
@@ -573,6 +581,7 @@ section[id^="tab-"].active{ display:block; }
       state.runFlags = state.runFlags || {};
       state.runFlags.berserkBoostActive = false;
       state.runFlags.berserkBoostPrevExpiry = null;
+      state.runFlags.hasteActive = false;
     }
 
     function clampRunTime(value){
@@ -1724,10 +1733,24 @@ section[id^="tab-"].active{ display:block; }
       });
     }
 
+    function isSkillDurationActive(key, nowTs){
+      if(!key) return false;
+      const ts = (typeof nowTs === 'number') ? nowTs : performance.now();
+      switch(key){
+        case 'haste':
+          return state.skillHasteUntil > ts;
+        case 'berserk':
+          return state.skillAtkBuffUntil === Infinity || state.skillAtkBuffUntil > ts;
+        default:
+          return false;
+      }
+    }
+
     function renderSkillBar(){
       syncSkillSlotsWithOwned();
       if(!state.inRun){ skillBarEl.style.display='none'; return; }
       skillBarEl.style.display='grid'; skillBarEl.innerHTML='';
+      const now = performance.now();
       for(let i=0;i<5;i++){
         const k = state.skillSlots[i];
         const b=document.createElement('button'); b.className='skillbtn'; b.textContent = k? ACTIVE_SKILLS.find(s=>s.key===k).name : '-';
@@ -1736,6 +1759,9 @@ section[id^="tab-"].active{ display:block; }
           const cd = Math.max(0, state.skillCooldowns[k]||0);
           if(cd>0){ b.classList.add('cd'); b.textContent = `${ACTIVE_SKILLS.find(s=>s.key===k).name} (${cd.toFixed(0)}s)`; b.disabled=true; }
           attachSkillButtonEvents(b, k);
+          if(isSkillDurationActive(k, now)){
+            b.classList.add('duration-active');
+          }
         }
         skillBarEl.appendChild(b);
       }
@@ -1859,7 +1885,14 @@ section[id^="tab-"].active{ display:block; }
         case 'meteor':
           for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const dmg = Math.max(10, Math.floor(o.maxHp*0.35)); o.hp -= dmg; if(o.hp<=0){ onOreBroken(i, o); } }
           SFX.skill(); break;
-        case 'haste': state.skillHasteUntil = performance.now()+5000; restartSpawnTimer(); SFX.skill(); break;
+        case 'haste': {
+          state.skillHasteUntil = performance.now()+5000;
+          state.runFlags = state.runFlags || {};
+          state.runFlags.hasteActive = true;
+          restartSpawnTimer();
+          SFX.skill();
+          break;
+        }
         case 'sonic':
           const gr = gridRect(); const cx = gr.width/2, cy = gr.height/2;
           const idx = findNearestOreIdx(cx,cy);
@@ -1891,6 +1924,7 @@ section[id^="tab-"].active{ display:block; }
     function startRun(){
       if(state.inRun) return;
       resetRunFlags();
+      state.skillHasteUntil = 0;
       state.skillAtkBuffUntil = 0;
       state.inRun = true;
       state.etherSpawned=false;
@@ -1925,6 +1959,12 @@ section[id^="tab-"].active{ display:block; }
         const cdKeys = Object.keys(state.skillCooldowns);
         if(cdKeys.length){
           for(const k of cdKeys){ state.skillCooldowns[k] = Math.max(0, state.skillCooldowns[k]-delta); }
+        }
+        state.runFlags = state.runFlags || {};
+        const hasteActiveNow = state.skillHasteUntil > now;
+        if(state.runFlags.hasteActive !== hasteActiveNow){
+          state.runFlags.hasteActive = hasteActiveNow;
+          restartSpawnTimer();
         }
         maybeHandleAutoBerserk();
         maybeHandleAutoSkills();
