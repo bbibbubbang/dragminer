@@ -238,7 +238,7 @@ window.UPGRADE_INFO = [
     getDescription: (state) => {
       const level = getUpgradeLevel(state, 'pet');
       const max = UPGRADE_CONFIG.pet.maxLevel || 0;
-      const current = level + (state.passive?.petPlus || 0) + (state.aether?.petPlus || 0);
+      const current = level + (state.passive?.petPlus || 0);
       const hasNext = !max || level < max;
       const suffix = hasNext ? ' (+1)' : '';
       return `보유: ${current}마리${suffix}`;
