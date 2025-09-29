@@ -256,6 +256,73 @@ section[id^="tab-"].active{ display:block; }
     ];
     window.ORE_DATA = ORES;
     const ORE_BY_KEY = new Map(ORES.map(ore=>[ore.key, ore]));
+    const ORE_SHINE_START_VALUE = ORE_BY_KEY.get('Silver')?.value ?? Infinity;
+    const ORE_MAX_VALUE = Math.max(...ORES.map(o=>o.value||0), 0);
+
+    function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+    function normalizeShine(value){
+      if(!Number.isFinite(value) || value <= ORE_SHINE_START_VALUE) return 0;
+      if(ORE_MAX_VALUE <= ORE_SHINE_START_VALUE) return 0;
+      return clamp01((value - ORE_SHINE_START_VALUE) / (ORE_MAX_VALUE - ORE_SHINE_START_VALUE));
+    }
+    function hexToRgb(hex){
+      if(typeof hex !== 'string') return { r: 255, g: 255, b: 255 };
+      let clean = hex.trim().replace('#','');
+      if(clean.length === 3){ clean = clean.split('').map(ch=>ch+ch).join(''); }
+      const num = parseInt(clean, 16);
+      if(!Number.isFinite(num)) return { r: 255, g: 255, b: 255 };
+      return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+    }
+    function rgbToHex({r,g,b}){
+      const toHex = (n)=>{ const clamped = Math.max(0, Math.min(255, Math.round(n))); return clamped.toString(16).padStart(2,'0'); };
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+    function mixHex(a,b,ratio){
+      const t = clamp01(ratio);
+      const ca = hexToRgb(a || '#ffffff');
+      const cb = hexToRgb(b || '#ffffff');
+      return rgbToHex({
+        r: ca.r + (cb.r - ca.r) * t,
+        g: ca.g + (cb.g - ca.g) * t,
+        b: ca.b + (cb.b - ca.b) * t
+      });
+    }
+    function hexToRgba(hex, alpha){
+      const { r, g, b } = hexToRgb(hex);
+      return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${clamp01(alpha)})`;
+    }
+    function computeOreVisuals(color, value){
+      const shine = normalizeShine(value);
+      if(shine <= 0){
+        return {
+          background: color,
+          glow: 'inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -2px 4px rgba(15,23,42,0.45)'
+        };
+      }
+      const highlight = mixHex(color, '#ffffff', 0.45 + 0.25 * shine);
+      const midTone = mixHex(color, '#f8fafc', 0.18 + 0.22 * shine);
+      const rim = mixHex(color, '#0f172a', 0.35 + 0.25 * shine);
+      const accent = mixHex(color, '#e2e8f0', 0.3 + 0.3 * shine);
+      const sparkleSize = (18 + 10 * shine).toFixed(1);
+      const midStop = (52 + 8 * shine).toFixed(1);
+      const baseStop = (78 + 6 * shine).toFixed(1);
+      const background = `radial-gradient(circle at 28% 28%, ${highlight} 0%, ${highlight} ${sparkleSize}%, ${midTone} ${midStop}%, ${color} ${baseStop}%, ${rim} 100%)`;
+      const outerGlow = `0 0 ${(6 + 10 * shine).toFixed(1)}px ${hexToRgba(accent, 0.25 + 0.2 * shine)}`;
+      const innerHighlight = `inset 0 1px 0 rgba(255,255,255,${(0.2 + 0.25 * shine).toFixed(2)})`;
+      const innerShade = `inset 0 -3px 6px rgba(15,23,42,${(0.55 - 0.1 * shine).toFixed(2)})`;
+      return {
+        background,
+        glow: `${innerHighlight}, ${innerShade}, ${outerGlow}`
+      };
+    }
+    function applyOreVisuals(ore){
+      if(!ore || ore.type === 'EtherOre') return;
+      const def = ORE_BY_KEY.get(ore.type);
+      if(!def) return;
+      const visuals = computeOreVisuals(def.color, def.value);
+      ore.bg = visuals.background;
+      ore.glow = visuals.glow;
+    }
     const SPAWN_COLUMN_MAP = {
       '석재':'Stone',
       '구리':'Copper',
@@ -1321,10 +1388,16 @@ section[id^="tab-"].active{ display:block; }
       for(let i=0;i<25;i++){
         const ore = state.grid[i];
         if(!ore) continue;
+        applyOreVisuals(ore);
         clampOreToGrid(ore, axisX, axisY);
         const el = document.createElement('div');
         el.className='ore';
         el.style.background=ore.bg;
+        if(ore.glow){
+          el.style.boxShadow = ore.glow;
+        }else{
+          el.style.boxShadow = '';
+        }
         let localX = ore.x - ORE_RADIUS;
         let localY = ore.y - ORE_RADIUS;
         const maxLeft = Math.max(0, gridWidth - ORE_SIZE);
@@ -2187,6 +2260,7 @@ section[id^="tab-"].active{ display:block; }
         x: axisX.start + (axisX.span>0 ? Math.random()*axisX.span : 0),
         y: axisY.start + (axisY.span>0 ? Math.random()*axisY.span : 0)
       };
+      applyOreVisuals(ore);
       clampOreToGrid(ore, axisX, axisY);
       state.grid[idx] = ore;
       renderGrid();
