@@ -1988,61 +1988,20 @@ section[id^="tab-"].active{ display:block; }
       const createPet = (style = BASE_PET_STYLE) => ({
         x: 8 + Math.random() * (width - 16),
         y: 8 + Math.random() * (height - 16),
-        vx:0,
-        vy:0,
-        targetIdx:-1,
-        swinging:false,
-        swingTime:0,
-        swingBaseAngle:0,
-        swingDir:1,
-        swingTurnDir:0,
-        swingArc:PET.swingArc,
-        swingRadius:PET.swingRadius,
-        swingDuration:PET.atkInterval,
-        wanderAngle: Math.random()*Math.PI*2,
-        wanderTimer: Math.random()*0.5,
-        wanderSpeed: 30 + Math.random()*20,
-        swingAxisX:0,
-        swingAxisY:0,
-        swingPerpX:0,
-        swingPerpY:0,
-        swingOriginX:0,
-        swingOriginY:0,
-        swingAmplitude:PET.swingRadius,
-        swingInertia:PET.swingRadius*0.5,
-        swingDriftAngle:0,
-        swingDriftStrength:0,
-        swingNoiseSeed:Math.random()*Math.PI*2,
-        swingNoiseScale:0,
-        swingStartOffsetX:0,
-        swingStartOffsetY:0,
-        swingStage:'idle',
-        swingChargeDuration:PET.atkInterval*0.4,
-        swingChargeStartX:0,
-        swingChargeStartY:0,
-        swingChargeEndX:0,
-        swingChargeEndY:0,
-        swingOscAngle:0,
-        swingOscAxisX:0,
-        swingOscAxisY:0,
-        swingOscAxisAngle:0,
-        swingOscAxisVel:0,
-        swingOscDuration:PET.atkInterval,
-        swingOscAmplitudeForward:PET.swingRadius,
-        swingOscAmplitudeBack:PET.swingRadius*0.6,
-        swingOscTurnDir:1,
-        swingOscTimer:0,
-        swingLastOffset:0,
-        swingCooldownTimer:0,
-        orbitDir:0,
-        orbitRadius:PET.swingRadius,
-        orbitAngle:0,
-        orbitAngularSpeed:0,
-        orbitOffset:0,
-        strafeDir:0,
-        strafeTimer:0,
-        engageState:'idle',
-        id:-1,
+        targetIdx: -1,
+        orbitAngle: Math.random() * Math.PI * 2,
+        orbitDir: Math.random() < 0.5 ? 1 : -1,
+        orbitSpeed: 1.2 + Math.random() * 0.6,
+        radialOffset: Math.random() * Math.PI * 2,
+        radiusScale: 1 + Math.random() * 0.2,
+        maxRadius: PET.swingRadius,
+        contactRadius: PET.swingRadius * 0.75,
+        prevRadial: 0,
+        prevContact: false,
+        lastHitMs: -1,
+        petalCount: 3,
+        followStrength: 12,
+        id: -1,
         damageMul: Number.isFinite(style.damageMul) ? style.damageMul : 1,
         color: style.bg || BASE_PET_STYLE.bg,
         borderColor: style.border || BASE_PET_STYLE.border,
@@ -2053,13 +2012,24 @@ section[id^="tab-"].active{ display:block; }
 
       const initPetMotion = (pet) => {
         pet.id = state.pets.length;
-        if(!Number.isFinite(pet.strafeDir) || pet.strafeDir === 0){
-          pet.strafeDir = pet.id % 2 === 0 ? 1 : -1;
-        } else {
-          pet.strafeDir = pet.strafeDir >= 0 ? 1 : -1;
+        pet.petalCount = Math.max(1, Number.isFinite(pet.petalCount) ? Math.round(pet.petalCount) : ((pet.id % 3) + 2));
+        pet.orbitDir = pet.id % 2 === 0 ? 1 : -1;
+        pet.orbitAngle = Number.isFinite(pet.orbitAngle) ? pet.orbitAngle : Math.random() * Math.PI * 2;
+        pet.orbitSpeed = Math.max(0.3, Number.isFinite(pet.orbitSpeed) ? pet.orbitSpeed : (PET.moveSpeed / Math.max(ORE_RADIUS + 8, PET.swingRadius)) * 0.55);
+        pet.radialOffset = Number.isFinite(pet.radialOffset) ? pet.radialOffset : Math.random() * Math.PI * 2;
+        pet.radiusScale = Number.isFinite(pet.radiusScale) ? pet.radiusScale : 1;
+        const baseRadius = Math.max(ORE_RADIUS + 12, PET.swingRadius * 0.9);
+        pet.maxRadius = baseRadius * Math.max(0.6, Math.min(1.4, pet.radiusScale));
+        pet.contactRadius = Math.max(ORE_RADIUS + 4, pet.maxRadius * 0.82);
+        pet.followStrength = Math.max(4, Number.isFinite(pet.followStrength) ? pet.followStrength : 12);
+        pet.prevRadial = 0;
+        pet.prevContact = false;
+        pet.lastHitMs = -1;
+        if(!Number.isFinite(pet.x) || !Number.isFinite(pet.y)){
+          pet.x = 8 + Math.random() * (width - 16);
+          pet.y = 8 + Math.random() * (height - 16);
         }
-        pet.strafeTimer = 0;
-        pet.engageState = 'idle';
+        pet.targetIdx = -1;
         return pet;
       };
 
@@ -2131,230 +2101,97 @@ section[id^="tab-"].active{ display:block; }
       }
       return findNearestOreFromList(p.x, p.y, oreIndices);
     }
-    function configurePetSwing(p, ore, reuseCycle=false, approachVX=0, approachVY=0, immediateStrike=false){
-      if(!ore) return false;
-      const dx = ore.x - p.x;
-      const dy = ore.y - p.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      const approachMag = Math.hypot(approachVX, approachVY);
-      let approachAngle = approachMag > 0.01 ? Math.atan2(approachVY, approachVX) : Math.atan2(dy, dx);
-      if(!Number.isFinite(approachAngle)){
-        approachAngle = Math.atan2(dy, dx);
+
+    function updatePetOrbitMotion(p, ore, dt, ts, gr){
+      if(!p || !ore) return;
+      const gridWidth = Math.max(gr.width || 0, 16);
+      const gridHeight = Math.max(gr.height || 0, 16);
+      const maxRadius = Math.max(ORE_RADIUS + 8, Number.isFinite(p.maxRadius) ? p.maxRadius : PET.swingRadius);
+      const followStrength = Math.max(4, Number.isFinite(p.followStrength) ? p.followStrength : 12);
+      const orbitSpeed = Math.max(0.3, Number.isFinite(p.orbitSpeed) ? p.orbitSpeed : (PET.moveSpeed / Math.max(ORE_RADIUS + 8, maxRadius)) * 0.55);
+      const dir = (Number.isFinite(p.orbitDir) && p.orbitDir < 0) ? -1 : 1;
+      const baseX = Number.isFinite(p.x) ? p.x : ore.x;
+      const baseY = Number.isFinite(p.y) ? p.y : ore.y;
+      const currentAngle = Number.isFinite(p.orbitAngle) ? p.orbitAngle : Math.atan2(baseY - ore.y, baseX - ore.x);
+      const nextAngle = currentAngle + orbitSpeed * dt * dir;
+      p.orbitAngle = nextAngle;
+      const petalCount = Math.max(1, Number.isFinite(p.petalCount) ? Math.round(p.petalCount) : 3);
+      const radialPhase = (Number.isFinite(p.radialOffset) ? p.radialOffset : 0) + petalCount * nextAngle;
+      const radial = Math.cos(radialPhase) * maxRadius;
+      const dirX = Math.cos(nextAngle);
+      const dirY = Math.sin(nextAngle);
+      const targetX = ore.x + dirX * radial;
+      const targetY = ore.y + dirY * radial;
+      const lerp = 1 - Math.exp(-followStrength * dt);
+      if(Number.isFinite(p.x)){
+        p.x += (targetX - p.x) * lerp;
+      } else {
+        p.x = targetX;
       }
-      const axisX = Math.cos(approachAngle);
-      const axisY = Math.sin(approachAngle);
-      const minOrbitRadius = ORE_RADIUS + 12;
-      const approachBoost = Math.max(12, approachMag * 0.25);
-      const desiredRadius = dist + approachBoost;
-      const baseOrbitRadius = Math.max(minOrbitRadius, Math.min(minOrbitRadius + 18, desiredRadius));
-      const chargeEndX = ore.x - axisX * baseOrbitRadius;
-      const chargeEndY = ore.y - axisY * baseOrbitRadius;
-      p.swinging = true;
-      p.swingStage = reuseCycle ? 'combo' : 'charge';
-      p.swingTime = 0;
-      p.swingOscTimer = reuseCycle ? (p.swingOscTimer || 0) : 0;
-      p.swingChargeDuration = Math.max(0.08, PET.atkInterval * 0.35);
-      p.swingChargeStartX = p.x;
-      p.swingChargeStartY = p.y;
-      p.swingChargeEndX = chargeEndX;
-      p.swingChargeEndY = chargeEndY;
-      const swingDir = (Number.isFinite(p.swingTurnDir) && p.swingTurnDir !== 0)
-        ? (p.swingTurnDir < 0 ? -1 : 1)
-        : (Math.random() < 0.5 ? -1 : 1);
-      p.swingTurnDir = swingDir;
-      p.orbitDir = swingDir;
-      p.orbitRadius = baseOrbitRadius;
-      const baseAngle = normalizeAngle(approachAngle + Math.PI);
-      p.swingBaseAngle = baseAngle;
-      p.orbitAngle = baseAngle;
-      p.orbitOffset = 0;
-      const linearOrbitSpeed = PET.moveSpeed * 0.9;
-      p.orbitAngularSpeed = linearOrbitSpeed / Math.max(ORE_RADIUS + 8, p.orbitRadius);
-      p.swingOscAxisX = Math.cos(baseAngle);
-      p.swingOscAxisY = Math.sin(baseAngle);
-      p.swingOscAxisAngle = baseAngle;
-      p.swingOscAxisVel = 0;
-      p.swingOscDuration = Math.max(0.45, PET.atkInterval * 0.85);
-      const forwardAmp = Math.min(baseOrbitRadius * 0.45, PET.swingRadius * 0.55);
-      const backAmp = Math.min(baseOrbitRadius * 0.3, PET.swingRadius * 0.4);
-      p.swingOscAmplitudeForward = forwardAmp;
-      p.swingOscAmplitudeBack = backAmp;
-      if(!Number.isFinite(p.flowerPetals) || p.flowerPetals <= 0){
-        p.flowerPetals = 5;
+      if(Number.isFinite(p.y)){
+        p.y += (targetY - p.y) * lerp;
+      } else {
+        p.y = targetY;
       }
-      if(!reuseCycle || !Number.isFinite(p.flowerPhase)){
-        p.flowerPhase = Math.random() * Math.PI * 2;
-      }
-      p.flowerBaseRadius = baseOrbitRadius;
-      p.flowerRadius = baseOrbitRadius;
-      p.swingCooldownTimer = 0;
-      p.swingLastOffset = 0;
-      p.swingInitialDamageDone = !immediateStrike;
-      p.lastApproachAngle = approachAngle;
-      p.lastApproachSpeed = approachMag;
-      p.lastApproachVX = approachMag > 0.01 ? axisX * approachMag : approachVX;
-      p.lastApproachVY = approachMag > 0.01 ? axisY * approachMag : approachVY;
-      p.swingOriginX = ore.x;
-      p.swingOriginY = ore.y;
-      return true;
-    }
-    function startPetSwing(p, ore){
-      const approachVX = p.vx;
-      const approachVY = p.vy;
-      if(!configurePetSwing(p, ore, false, approachVX, approachVY, true)) return;
-      p.vx *= 0.35;
-      p.vy *= 0.35;
-    }
-    function updateSwing(p, ore, dt){
-      if(!p.swinging || !ore) return false;
-      const atkInterval = Math.max(0.2, PET.atkInterval);
-      if(p.swingInitialDamageDone){
-        p.swingCooldownTimer = (p.swingCooldownTimer || 0) + dt;
-      }
-      if(!p.swingInitialDamageDone){
-        p.swingInitialDamageDone = true;
-        p.swingCooldownTimer = 0;
+      p.x = clamp(p.x, 8, gridWidth - 8);
+      p.y = clamp(p.y, 8, gridHeight - 8);
+      const prevContact = !!p.prevContact;
+      const contactRadius = Math.max(ORE_RADIUS + 4, Number.isFinite(p.contactRadius) ? p.contactRadius : maxRadius * 0.82);
+      const radialAbs = Math.abs(radial);
+      const timeSinceHit = Number.isFinite(p.lastHitMs) ? (ts - p.lastHitMs) / 1000 : Infinity;
+      const contactNow = radialAbs >= contactRadius;
+      if(contactNow && !prevContact && timeSinceHit >= Math.max(0.1, PET.atkInterval * 0.35) && p.targetIdx >= 0){
         hit(p.targetIdx,'pet',{ damageMul: p.damageMul || 1 });
-        const currentOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
-        if(!currentOre){
-          p.swinging = false;
-          p.swingTime = 0;
-          p.targetIdx = -1;
-          return true;
-        }
-        ore = currentOre;
+        p.lastHitMs = ts;
       }
-      const stage = p.swingStage || 'charge';
-      if(stage === 'charge'){
-        const duration = Math.max(0.08, p.swingChargeDuration || PET.atkInterval * 0.35);
-        p.swingTime += dt;
-        const tRaw = Math.min(1, p.swingTime / duration);
-        const eased = tRaw * tRaw * (3 - 2 * tRaw);
-        const prevX = p.x;
-        const prevY = p.y;
-        const startX = Number.isFinite(p.swingChargeStartX) ? p.swingChargeStartX : p.x;
-        const startY = Number.isFinite(p.swingChargeStartY) ? p.swingChargeStartY : p.y;
-        const endX = Number.isFinite(p.swingChargeEndX) ? p.swingChargeEndX : ore.x;
-        const endY = Number.isFinite(p.swingChargeEndY) ? p.swingChargeEndY : ore.y;
-        p.x = startX + (endX - startX) * eased;
-        p.y = startY + (endY - startY) * eased;
-        if(tRaw >= 1){
-          const dtSafe = Math.max(dt, 0.016);
-          p.vx = (p.x - prevX) / dtSafe;
-          p.vy = (p.y - prevY) / dtSafe;
-          p.swingStage = 'combo';
-          p.swingTime = 0;
-          const relX = p.x - ore.x;
-          const relY = p.y - ore.y;
-          const radiusNow = Math.hypot(relX, relY);
-          const desiredRadius = Math.max(ORE_RADIUS + 12, Number.isFinite(p.orbitRadius) ? p.orbitRadius : PET.swingRadius * 0.9);
-          p.orbitRadius = Number.isFinite(radiusNow) && radiusNow > 0 ? Math.max(ORE_RADIUS + 12, Math.min(desiredRadius, radiusNow)) : desiredRadius;
-          const alignAngle = normalizeAngle(Math.atan2(p.y - ore.y, p.x - ore.x));
-          p.swingBaseAngle = alignAngle;
-          p.orbitAngle = alignAngle;
-          p.orbitOffset = 0;
-          p.swingTurnDir = (Number.isFinite(p.swingTurnDir) && p.swingTurnDir !== 0) ? (p.swingTurnDir < 0 ? -1 : 1) : 1;
-          p.orbitDir = p.swingTurnDir;
-          p.swingOscAxisAngle = alignAngle;
-          p.swingOscAxisX = Math.cos(alignAngle);
-          p.swingOscAxisY = Math.sin(alignAngle);
-          p.swingOscAxisVel = 0;
-        }
-        return false;
-      }
-      const baseRadius = Math.max(ORE_RADIUS + 12, Number.isFinite(p.orbitRadius) ? p.orbitRadius : PET.swingRadius * 0.9);
-      const angularSpeed = Math.max(0, Number.isFinite(p.orbitAngularSpeed) ? p.orbitAngularSpeed : (PET.moveSpeed * 0.9) / Math.max(ORE_RADIUS + 8, baseRadius));
-      const swingArc = Number.isFinite(p.swingArc) ? p.swingArc : PET.swingArc;
-      const halfArc = Math.max(0.15, swingArc * 0.5);
-      let baseAngleTarget = null;
-      if(Number.isFinite(p.swingChargeEndX) && Number.isFinite(p.swingChargeEndY)){
-        baseAngleTarget = Math.atan2(p.swingChargeEndY - ore.y, p.swingChargeEndX - ore.x);
-      }
-      if(!Number.isFinite(baseAngleTarget)){
-        baseAngleTarget = Number.isFinite(p.swingBaseAngle) ? p.swingBaseAngle : Math.atan2(p.y - ore.y, p.x - ore.x);
-      }
-      baseAngleTarget = normalizeAngle(baseAngleTarget);
-      let baseAngle = baseAngleTarget;
-      if(Number.isFinite(p.swingBaseAngle)){
-        const diff = normalizeAngle(baseAngleTarget - p.swingBaseAngle);
-        const adjust = Math.min(1, dt * 4);
-        baseAngle = normalizeAngle(p.swingBaseAngle + diff * adjust);
-      }
-      let turnDir = Number.isFinite(p.swingTurnDir) && p.swingTurnDir < 0 ? -1 : 1;
-      let offset = Number.isFinite(p.orbitOffset) ? p.orbitOffset : 0;
-      offset += angularSpeed * dt * turnDir;
-      if(offset > halfArc){
-        offset = halfArc;
-        turnDir = -1;
-      } else if(offset < -halfArc){
-        offset = -halfArc;
-        turnDir = 1;
-      }
-      p.swingTurnDir = turnDir;
-      p.orbitDir = turnDir;
-      p.orbitOffset = offset;
-      const orbitAngle = normalizeAngle(baseAngle + offset);
-      p.swingBaseAngle = baseAngle;
-      p.orbitAngle = orbitAngle;
-      const axisX = Math.cos(orbitAngle);
-      const axisY = Math.sin(orbitAngle);
-      const perpX = -axisY;
-      const perpY = axisX;
-      p.swingOscAxisAngle = orbitAngle;
-      p.swingOscAxisX = axisX;
-      p.swingOscAxisY = axisY;
-      const targetRadius = Math.max(ORE_RADIUS + 12, Number.isFinite(p.orbitRadius) ? p.orbitRadius : PET.swingRadius * 0.9);
-      const radiusLerp = Math.min(1, dt * 6);
-      const currentBase = Number.isFinite(p.flowerBaseRadius) ? p.flowerBaseRadius : targetRadius;
-      const newBaseRadius = currentBase + (targetRadius - currentBase) * radiusLerp;
-      p.flowerBaseRadius = newBaseRadius;
-      p.orbitRadius = newBaseRadius;
-      const swingDuration = Math.max(0.3, Number.isFinite(p.swingOscDuration) ? p.swingOscDuration : PET.atkInterval * 0.85);
-      p.swingOscDuration = swingDuration;
-      p.swingOscTimer = (p.swingOscTimer || 0) + dt;
-      const cycle = swingDuration > 0 ? swingDuration : 0.3;
-      const phase = ((p.swingOscTimer % cycle) / cycle) || 0;
-      const forwardAmp = Number.isFinite(p.swingOscAmplitudeForward) ? p.swingOscAmplitudeForward : newBaseRadius * 0.45;
-      const backAmp = Number.isFinite(p.swingOscAmplitudeBack) ? p.swingOscAmplitudeBack : newBaseRadius * 0.3;
-      const swingCurve = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
-      const desiredRadius = Math.max(ORE_RADIUS + 10, newBaseRadius + (-backAmp + (forwardAmp + backAmp) * swingCurve));
-      const prevRadius = Number.isFinite(p.flowerRadius) ? p.flowerRadius : desiredRadius;
-      const smoothFactor = Math.min(1, dt * 10);
-      const radius = prevRadius + (desiredRadius - prevRadius) * smoothFactor;
-      p.flowerRadius = radius;
-      const swayAmount = Math.sin(phase * Math.PI * 2) * Math.min(forwardAmp, PET.swingRadius) * 0.18;
-      const prevX = p.x;
-      const prevY = p.y;
-      p.x = ore.x + axisX * radius + perpX * swayAmount;
-      p.y = ore.y + axisY * radius + perpY * swayAmount;
-      p.swingOscAxisAngle = normalizeAngle(Math.atan2(axisY, axisX));
-      p.swingOscAxisX = axisX;
-      p.swingOscAxisY = axisY;
-      const dtSafe = Math.max(dt, 0.016);
-      p.vx = (p.x - prevX) / dtSafe;
-      p.vy = (p.y - prevY) / dtSafe;
-      while((p.swingCooldownTimer || 0) >= atkInterval){
-        p.swingCooldownTimer -= atkInterval;
-        hit(p.targetIdx,'pet',{ damageMul: p.damageMul || 1 });
-        const currentOre = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
-        if(!currentOre){
-          p.swinging = false;
-          p.swingStage = 'idle';
-          p.swingTime = 0;
-          p.targetIdx = -1;
-          return true;
-        }
-        ore = currentOre;
-      }
-      return false;
+      p.prevContact = contactNow;
+      p.prevRadial = radial;
     }
+    function updatePetIdleMotion(p, dt, gr){
+      const gridWidth = Math.max(gr.width || 0, 16);
+      const gridHeight = Math.max(gr.height || 0, 16);
+      const minDimension = Math.min(gridWidth, gridHeight);
+      const centerX = gridWidth / 2;
+      const centerY = gridHeight / 2;
+      const dir = (Number.isFinite(p.orbitDir) && p.orbitDir < 0) ? -1 : 1;
+      const orbitSpeed = Math.max(0.25, Number.isFinite(p.orbitSpeed) ? p.orbitSpeed * 0.6 : 0.8);
+      const followStrength = Math.max(4, Number.isFinite(p.followStrength) ? p.followStrength * 0.6 : 8);
+      const angle = (Number.isFinite(p.orbitAngle) ? p.orbitAngle : Math.random() * Math.PI * 2) + orbitSpeed * dt * dir;
+      p.orbitAngle = angle;
+      const petalCount = Math.max(1, Number.isFinite(p.petalCount) ? Math.round(p.petalCount) : 3);
+      const availableRadius = Math.max(8, (minDimension / 2) - 10);
+      const idleRadiusBase = Math.min(Math.max(ORE_RADIUS + 6, minDimension * 0.18), availableRadius);
+      const idleRadiusScaled = Math.min(availableRadius, idleRadiusBase * (1 + (p.id % 3) * 0.12));
+      const idleRadius = Math.max(8, idleRadiusScaled);
+      const radial = Math.cos((Number.isFinite(p.radialOffset) ? p.radialOffset : 0) + petalCount * angle) * idleRadius;
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+      const targetX = centerX + dirX * radial;
+      const targetY = centerY + dirY * radial;
+      const lerp = 1 - Math.exp(-followStrength * dt);
+      if(Number.isFinite(p.x)){
+        p.x += (targetX - p.x) * lerp;
+      } else {
+        p.x = targetX;
+      }
+      if(Number.isFinite(p.y)){
+        p.y += (targetY - p.y) * lerp;
+      } else {
+        p.y = targetY;
+      }
+      p.x = clamp(p.x, 8, gridWidth - 8);
+      p.y = clamp(p.y, 8, gridHeight - 8);
+      p.prevContact = false;
+      p.prevRadial = 0;
+    }
+
     function petsFrame(ts){
       if(!state.inRun){
         state.animFrameId = 0;
         return;
       }
       const gr = gridRect();
-      const dt = Math.min(0.05,(ts-state.lastAnimTs)/1000 || 0.016);
+      const dt = Math.min(0.05,(ts - state.lastAnimTs)/1000 || 0.016);
       state.lastAnimTs = ts;
       const oreIndices = [];
       for(let i=0;i<25;i++){
@@ -2366,27 +2203,12 @@ section[id^="tab-"].active{ display:block; }
       for(const p of state.pets){
         if(p.targetIdx>=0 && state.grid[p.targetIdx]){
           oreTargetClaims.set(p.targetIdx, (oreTargetClaims.get(p.targetIdx)||0)+1);
-        } else if(p.targetIdx !== -1){
+        } else {
           p.targetIdx = -1;
+          p.prevContact = false;
         }
       }
       for(const p of state.pets){
-        if(p.swinging){
-          const ore = state.grid[p.targetIdx];
-          if(!ore){
-            if(p.targetIdx>=0){
-              const prevCount = oreTargetClaims.get(p.targetIdx) || 0;
-              if(prevCount <= 1){
-                oreTargetClaims.delete(p.targetIdx);
-              } else {
-                oreTargetClaims.set(p.targetIdx, prevCount - 1);
-              }
-            }
-            p.swinging=false;
-            p.targetIdx=-1;
-          }
-          continue;
-        }
         const hasTarget = p.targetIdx>=0 && state.grid[p.targetIdx];
         const targetCount = hasTarget ? (oreTargetClaims.get(p.targetIdx)||0) : 0;
         const needsRetarget = !hasTarget || (multiPets && multiOres && targetCount > 1);
@@ -2403,110 +2225,21 @@ section[id^="tab-"].active{ display:block; }
           p.targetIdx = newIdx;
           if(newIdx >= 0){
             oreTargetClaims.set(newIdx, (oreTargetClaims.get(newIdx)||0)+1);
-            p.engageState = 'approach';
-          } else {
-            p.engageState = 'idle';
+            p.prevContact = false;
           }
-          p.strafeTimer = 0;
-        }
-        const ore = p.targetIdx>=0 ? state.grid[p.targetIdx] : null;
-        if(ore){
-          const dx = ore.x - p.x;
-          const dy = ore.y - p.y;
-          const dist = Math.hypot(dx,dy) || 1;
-          const axisX = dx / dist;
-          const axisY = dy / dist;
-          const targetRadius = PET.swingRadius * 0.65;
-          if(dist > PET.swingRadius * 0.85){
-            p.engageState = 'approach';
-            p.strafeTimer = 0;
-            const approachSpeed = PET.moveSpeed;
-            const desiredVX = axisX * approachSpeed;
-            const desiredVY = axisY * approachSpeed;
-            p.vx += (desiredVX - p.vx) * 0.18;
-            p.vy += (desiredVY - p.vy) * 0.18;
-          } else {
-            if(p.engageState !== 'strafe'){
-              p.strafeTimer = 0;
-            }
-            p.engageState = 'strafe';
-            p.strafeTimer = (p.strafeTimer || 0) + dt;
-            if(p.strafeTimer > 10) p.strafeTimer -= 10;
-            if(!Number.isFinite(p.strafeDir) || p.strafeDir === 0){
-              p.strafeDir = (p.swingTurnDir || 1) >= 0 ? 1 : -1;
-            }
-            const strafeDir = p.strafeDir >= 0 ? 1 : -1;
-            const perpX = -axisY;
-            const perpY = axisX;
-            const strafeSpeed = PET.moveSpeed * 0.55;
-            const radialError = dist - targetRadius;
-            const radialCorrection = Math.max(
-              -PET.moveSpeed * 0.6,
-              Math.min(PET.moveSpeed * 0.6, radialError * 4)
-            );
-            const forwardOsc = Math.sin(p.strafeTimer * Math.PI * 2) * PET.moveSpeed * 0.2;
-            const desiredVX = perpX * strafeSpeed * strafeDir + axisX * (forwardOsc + radialCorrection);
-            const desiredVY = perpY * strafeSpeed * strafeDir + axisY * (forwardOsc + radialCorrection);
-            p.vx += (desiredVX - p.vx) * 0.2;
-            p.vy += (desiredVY - p.vy) * 0.2;
-          }
-        } else {
-          p.engageState = 'idle';
-          p.strafeTimer = 0;
-          p.wanderTimer = (p.wanderTimer || 0) - dt;
-          if(p.wanderTimer <= 0){
-            p.wanderTimer = 0.6 + Math.random()*0.6;
-            p.wanderAngle = Math.random()*Math.PI*2;
-            p.wanderSpeed = 30 + Math.random()*60;
-          }
-          const wanderSpeed = p.wanderSpeed || 0;
-          const wanderAngle = p.wanderAngle || 0;
-          p.vx += Math.cos(wanderAngle) * wanderSpeed * dt;
-          p.vy += Math.sin(wanderAngle) * wanderSpeed * dt;
-          p.vx *= 0.97;
-          p.vy *= 0.97;
-          p.targetIdx = -1;
-        }
-        const maxSpeed = PET.moveSpeed * 1.4;
-        const velMag = Math.hypot(p.vx, p.vy);
-        if(velMag > maxSpeed){
-          const scale = maxSpeed / velMag;
-          p.vx *= scale;
-          p.vy *= scale;
         }
       }
       for(const p of state.pets){
-        const ore = p.targetIdx>=0 ? state.grid[p.targetIdx] : null;
-        if(p.swinging){
-          if(ore){
-            updateSwing(p, ore, dt);
-          } else {
-            p.swinging = false;
-            p.targetIdx = -1;
-          }
-          p.x = Math.max(8, Math.min(gr.width-8, p.x));
-          p.y = Math.max(8, Math.min(gr.height-8, p.y));
-          continue;
-        }
-        p.x += p.vx*dt;
-        p.y += p.vy*dt;
-        p.x = Math.max(8, Math.min(gr.width-8, p.x));
-        p.y = Math.max(8, Math.min(gr.height-8, p.y));
-        if(!ore){
-          p.targetIdx = -1;
-          p.engageState = 'idle';
-          p.strafeTimer = 0;
-          continue;
-        }
-        const dist = Math.hypot(ore.x - p.x, ore.y - p.y);
-        if(dist<=PET.swingRadius){
-          startPetSwing(p, ore);
+        const ore = (p.targetIdx>=0) ? state.grid[p.targetIdx] : null;
+        if(ore){
+          updatePetOrbitMotion(p, ore, dt, ts, gr);
+        } else {
+          updatePetIdleMotion(p, dt, gr);
         }
       }
       renderPets();
       state.animFrameId = requestAnimationFrame(petsFrame);
     }
-
     const TAB_IDS = ['dungeon','inventory','upgrades','skills','aether','settings'];
     function activateTab(tabId){
       const target = TAB_IDS.includes(tabId) ? tabId : 'dungeon';
