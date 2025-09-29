@@ -2123,16 +2123,21 @@ section[id^="tab-"].active{ display:block; }
       const targetX = ore.x + dirX * radial;
       const targetY = ore.y + dirY * radial;
       const lerp = 1 - Math.exp(-followStrength * dt);
-      if(Number.isFinite(p.x)){
-        p.x += (targetX - p.x) * lerp;
-      } else {
-        p.x = targetX;
+      const maxStep = Math.max(0, PET.moveSpeed * dt);
+      const currentX = Number.isFinite(p.x) ? p.x : targetX;
+      const currentY = Number.isFinite(p.y) ? p.y : targetY;
+      let nextX = currentX + (targetX - currentX) * lerp;
+      let nextY = currentY + (targetY - currentY) * lerp;
+      const stepX = nextX - currentX;
+      const stepY = nextY - currentY;
+      const stepDist = Math.hypot(stepX, stepY);
+      if(stepDist > maxStep && stepDist > 0){
+        const scale = maxStep / stepDist;
+        nextX = currentX + stepX * scale;
+        nextY = currentY + stepY * scale;
       }
-      if(Number.isFinite(p.y)){
-        p.y += (targetY - p.y) * lerp;
-      } else {
-        p.y = targetY;
-      }
+      p.x = nextX;
+      p.y = nextY;
       p.x = clamp(p.x, 8, gridWidth - 8);
       p.y = clamp(p.y, 8, gridHeight - 8);
       const prevContact = !!p.prevContact;
