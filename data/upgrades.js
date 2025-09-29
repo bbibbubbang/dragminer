@@ -38,7 +38,7 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 90,
     costScale: 0.45,
-    costExponent: 1.2,
+    costExponent: 1.1,
   },
   crit: {
     defaultLevel: 0,
