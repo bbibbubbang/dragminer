@@ -447,6 +447,8 @@ section[id^="tab-"].active{ display:block; }
     const UPGRADE_DEFAULTS = window.UPGRADE_DEFAULTS;
     const UPGRADE_CONFIG = window.UPGRADE_CONFIG;
     const getUpgradeLevel = window.getUpgradeLevel;
+    const computePetBehaviorStats = window.computePetBehaviorStats;
+    const computeRefineryMultiplier = window.computeRefineryMultiplier;
     const VERSION = 'miner_v2.6.1';
     // 고정 세이브키 + 구버전 마이그레이션
     const SAVE_KEY = 'miner_save_v1';
@@ -786,6 +788,7 @@ section[id^="tab-"].active{ display:block; }
           const base = (typeof estimatedBase === 'number' && !Number.isNaN(estimatedBase)) ? estimatedBase : 0.10;
           state.player.critChanceBase = Math.max(0.01, +base.toFixed(4));
         }
+        applyPetBehaviorUpgrade();
       }catch(e){ console.warn('load failed', e); }
     }
 
@@ -829,14 +832,15 @@ section[id^="tab-"].active{ display:block; }
       state.upgrades.oreMul[o.key]=initialLevel;
     }
 
+    const PET_BASE = window.PET_BEHAVIOR_BASE || {};
     const PET = {
-      moveSpeed: 180,
-      atkInterval: 0.5,
+      moveSpeed: Number.isFinite(PET_BASE.moveSpeed) ? PET_BASE.moveSpeed : 180,
+      atkInterval: Number.isFinite(PET_BASE.atkInterval) ? PET_BASE.atkInterval : 0.5,
       sepRadius: 24,
       atkRange: 18,
       swingDuration: 0.24,
       swingArc: Math.PI * 0.85,
-      swingRadius: 28,
+      swingRadius: Number.isFinite(PET_BASE.swingRadius) ? PET_BASE.swingRadius : 28,
     };
 
     const BASE_PET_STYLE = {
@@ -873,6 +877,45 @@ section[id^="tab-"].active{ display:block; }
     const PET_SIZE = 16;
     const PET_RADIUS = PET_SIZE / 2;
     const GRID_SAFE_MARGIN = 6;
+
+    function applyPetBehaviorUpgrade(){
+      const level = getUpgradeLevel(state, 'petAi');
+      let stats = null;
+      if(typeof computePetBehaviorStats === 'function'){
+        try {
+          stats = computePetBehaviorStats(level);
+        }catch(err){
+          console.warn('Failed to compute pet behavior stats', err);
+        }
+      }
+      const base = window.PET_BEHAVIOR_BASE || {};
+      const fallback = {
+        moveSpeed: Math.min(320, (Number.isFinite(base.moveSpeed) ? base.moveSpeed : 180) + 12 * Math.max(0, level)),
+        atkInterval: Math.max(0.24, (Number.isFinite(base.atkInterval) ? base.atkInterval : 0.5) - 0.015 * Math.max(0, level)),
+        swingRadius: Math.min(42, (Number.isFinite(base.swingRadius) ? base.swingRadius : 28) + 1.4 * Math.max(0, level)),
+      };
+      const next = stats || fallback;
+      if(Number.isFinite(next.moveSpeed)) PET.moveSpeed = next.moveSpeed;
+      if(Number.isFinite(next.atkInterval)) PET.atkInterval = next.atkInterval;
+      if(Number.isFinite(next.swingRadius)) PET.swingRadius = next.swingRadius;
+      const baseRadius = Math.max(ORE_RADIUS + 12, PET.swingRadius * 0.9);
+      const defaultContact = Math.max(ORE_RADIUS + 2, PET.swingRadius * 0.75);
+      for(const pet of state.pets){
+        if(!pet) continue;
+        const scale = Number.isFinite(pet.radiusScale) ? pet.radiusScale : 1;
+        const maxRadius = baseRadius * Math.max(0.6, Math.min(1.4, scale));
+        pet.maxRadius = maxRadius;
+        pet.contactRadius = Math.max(ORE_RADIUS + 2, Math.min(maxRadius - 1, defaultContact));
+        pet.orbitSpeed = Math.max(0.3, (PET.moveSpeed / Math.max(ORE_RADIUS + 8, PET.swingRadius)) * 0.55);
+        const prevFollow = Number.isFinite(pet.followStrength) ? pet.followStrength : 0;
+        const followTarget = Math.max(prevFollow, PET.moveSpeed / 24);
+        pet.followStrength = Math.max(3, followTarget);
+      }
+    }
+
+    window.applyPetBehaviorUpgrade = applyPetBehaviorUpgrade;
+
+    applyPetBehaviorUpgrade();
 
     function parseCssPx(v){
       const n = parseFloat(v);
@@ -1318,7 +1361,18 @@ section[id^="tab-"].active{ display:block; }
     }
 
     function levelMultiplier(level){
-      return 1 + Math.max(0, level) * 0.01;
+      const oreLevel = Math.max(0, level);
+      const upgradeLevel = getUpgradeLevel(state, 'refinery');
+      if(typeof computeRefineryMultiplier === 'function'){
+        try{
+          return computeRefineryMultiplier(upgradeLevel, oreLevel);
+        }catch(err){
+          console.warn('Failed to compute refinery multiplier', err);
+        }
+      }
+      const perLevel = 0.01 + 0.0025 * upgradeLevel;
+      const flat = 1 + 0.01 * upgradeLevel;
+      return (1 + oreLevel * perLevel) * flat;
     }
 
     function formatMultiplier(mult){
@@ -1563,7 +1617,7 @@ section[id^="tab-"].active{ display:block; }
           const price = typeof info.getCost === 'function' ? info.getCost(state) : cost;
           if(!spend(price)){ SFX.deny(); return; }
           if(typeof info.onBuy === 'function'){
-            info.onBuy({ state, restartSpawnTimer, spawnPets });
+            info.onBuy({ state, restartSpawnTimer, spawnPets, applyPetBehaviorUpgrade });
           }
           SFX.ui();
           save();
@@ -2278,6 +2332,7 @@ section[id^="tab-"].active{ display:block; }
       }
       state.floor = 1;
       state.highestFloor = 1;
+      applyPetBehaviorUpgrade();
     }
 
     function spawnOre(){

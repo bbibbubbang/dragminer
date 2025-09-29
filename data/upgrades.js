@@ -57,9 +57,82 @@ const UPGRADE_CONFIG = {
     costExponent: 1.1,
     maxLevel: 100,
   },
+  petAi: {
+    defaultLevel: 0,
+    baseCost: 650,
+    costExponent: 1.18,
+  },
+  refinery: {
+    defaultLevel: 0,
+    baseCost: 520,
+    costExponent: 1.17,
+  },
 };
 
 window.UPGRADE_CONFIG = UPGRADE_CONFIG;
+
+const PET_BEHAVIOR_BASE = {
+  moveSpeed: 180,
+  atkInterval: 0.5,
+  swingRadius: 28,
+};
+
+const PET_BEHAVIOR_GROWTH = {
+  moveSpeedPerLevel: 12,
+  atkIntervalPerLevel: 0.015,
+  swingRadiusPerLevel: 1.4,
+};
+
+const PET_BEHAVIOR_LIMITS = {
+  maxMoveSpeed: 320,
+  minAtkInterval: 0.24,
+  maxSwingRadius: 42,
+};
+
+function computePetBehaviorStats(level = 0) {
+  const lvl = Math.max(0, Math.floor(level));
+  const moveSpeed = Math.min(
+    PET_BEHAVIOR_LIMITS.maxMoveSpeed,
+    PET_BEHAVIOR_BASE.moveSpeed + PET_BEHAVIOR_GROWTH.moveSpeedPerLevel * lvl,
+  );
+  const atkInterval = Math.max(
+    PET_BEHAVIOR_LIMITS.minAtkInterval,
+    PET_BEHAVIOR_BASE.atkInterval - PET_BEHAVIOR_GROWTH.atkIntervalPerLevel * lvl,
+  );
+  const swingRadius = Math.min(
+    PET_BEHAVIOR_LIMITS.maxSwingRadius,
+    PET_BEHAVIOR_BASE.swingRadius + PET_BEHAVIOR_GROWTH.swingRadiusPerLevel * lvl,
+  );
+  return { moveSpeed, atkInterval, swingRadius };
+}
+
+window.PET_BEHAVIOR_BASE = PET_BEHAVIOR_BASE;
+window.computePetBehaviorStats = computePetBehaviorStats;
+
+const REFINERY_EFFECT = {
+  perLevelBase: 0.01,
+  perLevelPerUpgrade: 0.0025,
+  flatPerUpgrade: 0.01,
+};
+
+function computeRefineryStats(level = 0) {
+  const lvl = Math.max(0, Math.floor(level));
+  const perLevel = REFINERY_EFFECT.perLevelBase + (REFINERY_EFFECT.perLevelPerUpgrade * lvl);
+  const flatBonus = REFINERY_EFFECT.flatPerUpgrade * lvl;
+  return { perLevel, flatBonus };
+}
+
+function computeRefineryMultiplier(upgradeLevel = 0, oreLevel = 0) {
+  const lvl = Math.max(0, Math.floor(oreLevel));
+  const stats = computeRefineryStats(upgradeLevel);
+  const base = 1 + lvl * stats.perLevel;
+  const flat = 1 + stats.flatBonus;
+  return base * flat;
+}
+
+window.REFINERY_EFFECT = REFINERY_EFFECT;
+window.computeRefineryStats = computeRefineryStats;
+window.computeRefineryMultiplier = computeRefineryMultiplier;
 
 function normalizeLevel(value, fallback = 0) {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -265,6 +338,59 @@ window.UPGRADE_INFO = [
       const next = getUpgradeLevel(state, 'pet') + 1;
       setUpgradeLevel(state, 'pet', next);
       if (state.inRun) spawnPets();
+    },
+  },
+  {
+    key: 'petAi',
+    title: '🧠 펫 행동 알고리즘',
+    getLevel: (state) => getUpgradeLevel(state, 'petAi'),
+    getLevelLabel: (state) => `Lv ${getUpgradeLevel(state, 'petAi')}`,
+    getDescription: (state) => {
+      const level = getUpgradeLevel(state, 'petAi');
+      const current = computePetBehaviorStats(level);
+      const next = computePetBehaviorStats(level + 1);
+      const formatSpeed = (value) => `${Math.round(value)}px/s`;
+      const formatInterval = (value) => `${value.toFixed(2)}초`;
+      const formatRadius = (value) => `${value.toFixed(1)}px`;
+      const parts = [
+        `이동 속도: ${formatSpeed(current.moveSpeed)} → ${formatSpeed(next.moveSpeed)}`,
+        `공격 주기: ${formatInterval(current.atkInterval)} → ${formatInterval(next.atkInterval)}`,
+        `채굴 반경: ${formatRadius(current.swingRadius)} → ${formatRadius(next.swingRadius)}`,
+      ];
+      return parts.join('<br>');
+    },
+    getCost: (state) => upgradeCostLinear(state, 'petAi'),
+    canBuy: () => true,
+    onBuy: ({ state, applyPetBehaviorUpgrade }) => {
+      const next = getUpgradeLevel(state, 'petAi') + 1;
+      setUpgradeLevel(state, 'petAi', next);
+      if (typeof applyPetBehaviorUpgrade === 'function') {
+        applyPetBehaviorUpgrade();
+      }
+    },
+  },
+  {
+    key: 'refinery',
+    title: '⚗️ 정제 공정 최적화',
+    getLevel: (state) => getUpgradeLevel(state, 'refinery'),
+    getLevelLabel: (state) => `Lv ${getUpgradeLevel(state, 'refinery')}`,
+    getDescription: (state) => {
+      const level = getUpgradeLevel(state, 'refinery');
+      const current = computeRefineryStats(level);
+      const next = computeRefineryStats(level + 1);
+      const perLevelPercent = (value) => `${(value * 100).toFixed(2)}%`;
+      const flatPercent = (value) => `${(value * 100).toFixed(1)}%`;
+      const parts = [
+        `판매 레벨 보너스: +${perLevelPercent(current.perLevel)} → +${perLevelPercent(next.perLevel)} (레벨당)`,
+        `추가 판매 배수: +${flatPercent(current.flatBonus)} → +${flatPercent(next.flatBonus)}`,
+      ];
+      return parts.join('<br>');
+    },
+    getCost: (state) => upgradeCostLinear(state, 'refinery'),
+    canBuy: () => true,
+    onBuy: ({ state }) => {
+      const next = getUpgradeLevel(state, 'refinery') + 1;
+      setUpgradeLevel(state, 'refinery', next);
     },
   },
 ];
