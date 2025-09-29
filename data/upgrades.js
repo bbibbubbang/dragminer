@@ -15,6 +15,24 @@ function spawnIntervalForLevel(level = 0) {
 
 window.spawnIntervalForLevel = spawnIntervalForLevel;
 
+const ATK_GROWTH = {
+  perLevel: 0.12,
+  milestoneBonus: 0.35,
+  milestoneStep: 10,
+};
+
+window.ATK_GROWTH = ATK_GROWTH;
+
+function computeAtkMultiplier(level = 0) {
+  const lvl = Math.max(0, Math.floor(level));
+  const per = Math.pow(1 + ATK_GROWTH.perLevel, lvl);
+  const bonusCount = Math.floor(lvl / ATK_GROWTH.milestoneStep);
+  const bonus = Math.pow(1 + ATK_GROWTH.milestoneBonus, bonusCount);
+  return per * bonus;
+}
+
+window.computeAtkMultiplier = computeAtkMultiplier;
+
 const UPGRADE_CONFIG = {
   atk: {
     defaultLevel: 0,
@@ -93,11 +111,8 @@ function previewAtk(state, level){
   const baseFloor = 10 + ownedPower;
   const storedBase = typeof state?.player?.atkBase === 'number' ? state.player.atkBase : 10;
   const base = Math.max(storedBase, baseFloor);
-  const ATK_PER_LVL = 0.12;
-  const ATK_MILE = 0.35;
-  const per = Math.pow(1 + ATK_PER_LVL, Math.max(0, lvl));
-  const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, lvl) / 10));
-  return Math.max(1, Math.ceil(base * per * bonus));
+  const multiplier = computeAtkMultiplier(lvl);
+  return Math.max(1, Math.ceil(base * multiplier));
 }
 
 function previewCritChance(state, level){
