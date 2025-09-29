@@ -124,6 +124,9 @@ function upgradeCostLinear(state, key) {
   const steps = Math.max(0, currentLevel - baseLevel);
   const scale = typeof cfg.costScale === 'number' ? cfg.costScale : 0;
   const exponent = typeof cfg.costExponent === 'number' ? cfg.costExponent : 1;
+  // Upgrade costs scale by raising (1 + steps * scale) to the configured exponent
+  // rather than simply squaring the value. The exponent defaults to 1 for linear
+  // scaling, but can be fractional (e.g. 1.1) to create gentle exponential growth.
   const scaled = Math.pow(1 + steps * scale, exponent);
   return Math.floor(cfg.baseCost * scaled);
 }
