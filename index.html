@@ -338,6 +338,7 @@ section[id^="tab-"].active{ display:block; }
     const UPGRADE_INFO = window.UPGRADE_INFO;
     const UPGRADE_DEFAULTS = window.UPGRADE_DEFAULTS;
     const UPGRADE_CONFIG = window.UPGRADE_CONFIG;
+    const getUpgradeLevel = window.getUpgradeLevel;
     const VERSION = 'miner_v2.6.1';
     // 고정 세이브키 + 구버전 마이그레이션
     const SAVE_KEY = 'miner_save_v1';
@@ -1151,7 +1152,7 @@ section[id^="tab-"].active{ display:block; }
     function calcCritChance(){
       const cfg = UPGRADE_CONFIG?.crit;
       const base = (typeof state.player.critChanceBase === 'number') ? state.player.critChanceBase : 0.10;
-      const lvl = state.upgrades.crit?.level || 0;
+      const lvl = getUpgradeLevel(state, 'crit');
       const perLevel = cfg?.effectPerLevel || 0.02;
       const totalRaw = base + (perLevel * lvl);
       const total = Math.max(0, +totalRaw.toFixed(4));
@@ -1160,7 +1161,7 @@ section[id^="tab-"].active{ display:block; }
     }
 
     function calcAtk() {
-      const L = Math.max(0, state.upgrades.atk?.level || 0);
+      const L = Math.max(0, getUpgradeLevel(state, 'atk'));
       const powerPassive = PASSIVE_SKILLS.find((sk) => sk.key === 'power');
       const maxPowerLevel = powerPassive ? passiveMaxLevel(powerPassive) : 0;
       const ownedPower = Math.min(maxPowerLevel, state.skillsOwnedPassive?.power || 0);
@@ -1881,7 +1882,7 @@ section[id^="tab-"].active{ display:block; }
     }
 
     function restartSpawnTimer(){
-      const level = state.upgrades.spawn.level;
+      const level = getUpgradeLevel(state, 'spawn');
       const baseInterval = (typeof window.spawnIntervalForLevel === 'function')
         ? window.spawnIntervalForLevel(level)
         : Math.max(600, 2200 * Math.pow(0.94, level));
@@ -2063,7 +2064,7 @@ section[id^="tab-"].active{ display:block; }
 
     function spawnPets(){
       state.pets = [];
-      const baseCount = (state.upgrades.pet.level || 0) + (state.passive.petPlus || 0);
+      const baseCount = getUpgradeLevel(state, 'pet') + (state.passive.petPlus || 0);
       const specialCount = Math.max(0, state.aether?.petPlus || 0);
       const gr = gridRect();
       const width = Math.max(16, gr.width);

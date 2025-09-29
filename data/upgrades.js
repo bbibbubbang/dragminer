@@ -47,8 +47,41 @@ const UPGRADE_CONFIG = {
 
 window.UPGRADE_CONFIG = UPGRADE_CONFIG;
 
+function normalizeLevel(value, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+  if (value && typeof value.level === 'number' && Number.isFinite(value.level)) {
+    return Math.max(0, Math.floor(value.level));
+  }
+  return Math.max(0, Math.floor(fallback));
+}
+
+function getUpgradeLevel(state, key) {
+  const cfg = UPGRADE_CONFIG?.[key] || {};
+  const defaultLevel = cfg.defaultLevel || 0;
+  if (!state || !state.upgrades) {
+    return normalizeLevel(undefined, defaultLevel);
+  }
+  return normalizeLevel(state.upgrades[key], defaultLevel);
+}
+
+function setUpgradeLevel(state, key, level) {
+  if (!state || !state.upgrades) return;
+  const nextLevel = normalizeLevel(level, 0);
+  const entry = state.upgrades[key];
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    entry.level = nextLevel;
+  } else {
+    state.upgrades[key] = { level: nextLevel };
+  }
+}
+
+window.getUpgradeLevel = getUpgradeLevel;
+window.setUpgradeLevel = setUpgradeLevel;
+
 window.UPGRADE_DEFAULTS = Object.fromEntries(
-  Object.entries(UPGRADE_CONFIG).map(([key, cfg]) => [key, { level: cfg.defaultLevel || 0 }])
+  Object.entries(UPGRADE_CONFIG).map(([key, cfg]) => [key, { level: normalizeLevel(cfg.defaultLevel || 0) }])
 );
 
 function previewAtk(state, level){
@@ -86,9 +119,8 @@ function spawnUpgradeMaxLevel(){
 function upgradeCostLinear(state, key) {
   const cfg = UPGRADE_CONFIG[key];
   if (!cfg) return 0;
-  const entry = state.upgrades[key] || {};
-  const currentLevel = typeof entry.level === 'number' ? entry.level : (cfg.defaultLevel || 0);
-  const baseLevel = cfg.defaultLevel || 0;
+  const currentLevel = getUpgradeLevel(state, key);
+  const baseLevel = Math.max(0, Math.floor(cfg.defaultLevel || 0));
   const steps = Math.max(0, currentLevel - baseLevel);
   const scale = typeof cfg.costScale === 'number' ? cfg.costScale : 0;
   const exponent = typeof cfg.costExponent === 'number' ? cfg.costExponent : 1;
@@ -100,10 +132,10 @@ window.UPGRADE_INFO = [
   {
     key: 'atk',
     title: '🗡️ 공격력',
-    getLevel: (state) => state.upgrades.atk.level,
-    getLevelLabel: (state) => `Lv ${state.upgrades.atk.level}`,
+    getLevel: (state) => getUpgradeLevel(state, 'atk'),
+    getLevelLabel: (state) => `Lv ${getUpgradeLevel(state, 'atk')}`,
     getDescription: (state) => {
-      const level = state.upgrades.atk.level;
+      const level = getUpgradeLevel(state, 'atk');
       const current = previewAtk(state, level);
       const next = previewAtk(state, level + 1);
       const delta = Math.max(0, next - current);
@@ -113,16 +145,17 @@ window.UPGRADE_INFO = [
     getCost: (state) => upgradeCostLinear(state, 'atk'),
     canBuy: () => true,
     onBuy: ({ state }) => {
-      state.upgrades.atk.level++;
+      const next = getUpgradeLevel(state, 'atk') + 1;
+      setUpgradeLevel(state, 'atk', next);
     },
   },
   {
     key: 'crit',
     title: '🎯 치명타 확률',
-    getLevel: (state) => state.upgrades.crit.level,
-    getLevelLabel: (state) => `Lv ${state.upgrades.crit.level}`,
+    getLevel: (state) => getUpgradeLevel(state, 'crit'),
+    getLevelLabel: (state) => `Lv ${getUpgradeLevel(state, 'crit')}`,
     getDescription: (state) => {
-      const level = state.upgrades.crit.level;
+      const level = getUpgradeLevel(state, 'crit');
       const current = previewCritChance(state, level);
       const next = previewCritChance(state, level + 1);
       const delta = Math.max(0, next - current);
@@ -132,20 +165,21 @@ window.UPGRADE_INFO = [
     getCost: (state) => upgradeCostLinear(state, 'crit'),
     canBuy: () => true,
     onBuy: ({ state }) => {
-      state.upgrades.crit.level++;
+      const next = getUpgradeLevel(state, 'crit') + 1;
+      setUpgradeLevel(state, 'crit', next);
     },
   },
   {
     key: 'spawn',
     title: '⚙️ 생성 속도',
-    getLevel: (state) => state.upgrades.spawn.level,
+    getLevel: (state) => getUpgradeLevel(state, 'spawn'),
     getLevelLabel: (state) => {
-      const level = state.upgrades.spawn.level;
+      const level = getUpgradeLevel(state, 'spawn');
       const max = spawnUpgradeMaxLevel();
       return max ? `Lv ${level}/${max}` : `Lv ${level}`;
     },
     getDescription: (state) => {
-      const level = state.upgrades.spawn.level;
+      const level = getUpgradeLevel(state, 'spawn');
       const current = spawnIntervalForLevel(level);
       const max = spawnUpgradeMaxLevel();
       const next = spawnIntervalForLevel(level + 1);
@@ -157,27 +191,29 @@ window.UPGRADE_INFO = [
     getCost: (state) => upgradeCostLinear(state, 'spawn'),
     canBuy: (state) => {
       const max = spawnUpgradeMaxLevel();
-      if (max && state.upgrades.spawn.level >= max) {
+      const level = getUpgradeLevel(state, 'spawn');
+      if (max && level >= max) {
         return '이미 최대 레벨입니다.';
       }
       return true;
     },
     onBuy: ({ state, restartSpawnTimer }) => {
-      state.upgrades.spawn.level++;
+      const next = getUpgradeLevel(state, 'spawn') + 1;
+      setUpgradeLevel(state, 'spawn', next);
       if (state.inRun) restartSpawnTimer();
     },
   },
   {
     key: 'pet',
     title: '🤖 자동채굴 펫',
-    getLevel: (state) => state.upgrades.pet.level,
+    getLevel: (state) => getUpgradeLevel(state, 'pet'),
     getLevelLabel: (state) => {
-      const level = state.upgrades.pet.level;
+      const level = getUpgradeLevel(state, 'pet');
       const max = UPGRADE_CONFIG.pet.maxLevel || 0;
       return max ? `Lv ${level}/${max}` : `Lv ${level}`;
     },
     getDescription: (state) => {
-      const level = state.upgrades.pet.level;
+      const level = getUpgradeLevel(state, 'pet');
       const max = UPGRADE_CONFIG.pet.maxLevel || 0;
       const current = level + (state.passive?.petPlus || 0) + (state.aether?.petPlus || 0);
       const hasNext = !max || level < max;
@@ -187,14 +223,15 @@ window.UPGRADE_INFO = [
     getCost: (state) => upgradeCostLinear(state, 'pet'),
     canBuy: (state) => {
       const max = UPGRADE_CONFIG.pet.maxLevel || Infinity;
-      const current = state.upgrades.pet.level || 0;
+      const current = getUpgradeLevel(state, 'pet');
       if (current >= max) {
         return `최대 ${max}마리까지 구매 가능합니다.`;
       }
       return true;
     },
     onBuy: ({ state, spawnPets }) => {
-      state.upgrades.pet.level++;
+      const next = getUpgradeLevel(state, 'pet') + 1;
+      setUpgradeLevel(state, 'pet', next);
       if (state.inRun) spawnPets();
     },
   },
