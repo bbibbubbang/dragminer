@@ -344,17 +344,64 @@ section[id^="tab-"].active{ display:block; }
     const LEGACY_KEYS = Object.keys(localStorage).filter(k=>/^miner_v/.test(k));
 
     // ---------- Audio ----------
-    let audioCtx = null, sfxEnabled = true;
-    function ensureAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+    let audioCtx = null, audioResumePromise = null, sfxEnabled = true;
+    const AUDIO_UNLOCK_EVENTS = ['pointerdown','touchstart','mousedown','keydown'];
+    const AUDIO_UNLOCK_OPTS = { passive:true };
+    let audioUnlockBound = false;
+    function ensureAudio(){
+      if(!audioCtx){
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if(!Ctor) return null;
+        audioCtx = new Ctor();
+      }
+      if(audioCtx?.state === 'suspended' && audioCtx.resume){
+        if(!audioResumePromise){
+          audioResumePromise = audioCtx.resume().catch(err=>{
+            console.warn('AudioContext resume failed', err);
+          }).finally(()=>{ audioResumePromise = null; });
+          if(audioResumePromise?.then){
+            audioResumePromise.then(()=>{
+              if(audioCtx?.state === 'running') removeAudioUnlockListeners();
+            }).catch(()=>{});
+          }
+        }
+      }
+      if(audioCtx?.state === 'running'){
+        removeAudioUnlockListeners();
+      }
+      return audioCtx;
+    }
+    function addAudioUnlockListeners(){
+      if(audioUnlockBound) return;
+      audioUnlockBound = true;
+      AUDIO_UNLOCK_EVENTS.forEach(evt=>{
+        document.addEventListener(evt, handleAudioUnlock, AUDIO_UNLOCK_OPTS);
+      });
+    }
+    function removeAudioUnlockListeners(){
+      if(!audioUnlockBound) return;
+      audioUnlockBound = false;
+      AUDIO_UNLOCK_EVENTS.forEach(evt=>{
+        document.removeEventListener(evt, handleAudioUnlock, AUDIO_UNLOCK_OPTS);
+      });
+    }
+    function handleAudioUnlock(){
+      if(!ensureAudio()) return;
+      if(audioCtx?.state === 'running'){
+        removeAudioUnlockListeners();
+      }
+    }
+    addAudioUnlockListeners();
     function beep(freq=600, dur=0.06, type='square', gain=0.03){
       if(!sfxEnabled) return;
-      ensureAudio();
-      const t = audioCtx.currentTime;
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
+      const ctx = ensureAudio();
+      if(!ctx) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
       o.type = type; o.frequency.value = freq;
       g.gain.value = gain;
-      o.connect(g); g.connect(audioCtx.destination);
+      o.connect(g); g.connect(ctx.destination);
       o.start(t);
       o.stop(t+dur);
     }
@@ -407,13 +454,14 @@ section[id^="tab-"].active{ display:block; }
       return hitSoundPromise;
     }
     function playBuffer(buffer, gainValue=0.6){
-      if(!buffer || !audioCtx) return;
-      const source = audioCtx.createBufferSource();
-      const gain = audioCtx.createGain();
+      const ctx = ensureAudio();
+      if(!buffer || !ctx) return;
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
       gain.gain.value = gainValue;
       source.buffer = buffer;
       source.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(ctx.destination);
       try{ source.start(); }
       catch(err){ console.warn('Failed to start buffer', err); }
     }
@@ -1989,15 +2037,24 @@ section[id^="tab-"].active{ display:block; }
       (crit?SFX.crit:SFX.hit)();
     }
 
-    function onPointerDown(e){ e.preventDefault(); trackPointer(e, true); }
+    function onPointerDown(e){
+      e.preventDefault();
+      try{ gridEl.setPointerCapture?.(e.pointerId); }catch(err){ }
+      trackPointer(e, true);
+    }
     function onPointerMove(e){ e.preventDefault(); trackPointer(e, false); }
-    function onPointerUp(e){ const ps = state.pointerState[e.pointerId]; if(ps) delete state.pointerState[e.pointerId]; }
+    function onPointerUp(e){
+      try{ gridEl.releasePointerCapture?.(e.pointerId); }catch(err){ }
+      const ps = state.pointerState[e.pointerId];
+      if(ps) delete state.pointerState[e.pointerId];
+    }
     function trackPointer(e, isDown){ const id=e.pointerId||0; const idx = oreIndexFromPoint(e.clientX, e.clientY); const inside = idx>=0; const prev = state.pointerState[id] || { idx:-1, inside:false }; if(isDown){ if(inside){ hit(idx,'tap'); state.pointerState[id]={idx,inside:true}; } else { state.pointerState[id]={idx,inside:false}; } } else { if(prev.idx!==idx){ prev.inside=false; prev.idx=idx; } if(!prev.inside && inside){ hit(idx,'tap'); prev.inside=true; prev.idx=idx; } if(prev.inside && !inside){ prev.inside=false; } state.pointerState[id]=prev; } }
 
     gridEl.addEventListener('pointerdown', onPointerDown, {passive:false});
     gridEl.addEventListener('pointermove', onPointerMove, {passive:false});
     gridEl.addEventListener('pointerup', onPointerUp, {passive:false});
     gridEl.addEventListener('pointercancel', onPointerUp, {passive:false});
+    gridEl.addEventListener('lostpointercapture', onPointerUp);
 
     // Pull-to-refresh guard
     let startY = 0, atTop = false;
@@ -2331,7 +2388,12 @@ section[id^="tab-"].active{ display:block; }
     $('#saveBtn').addEventListener('click', ()=>{ SFX.ui(); save(); });
     $('#resetBtn').addEventListener('click', ()=>{ SFX.ui(); if(confirm('정말 전체 초기화할까요? (세이브 전부 삭제)')){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} try{ LEGACY_KEYS.forEach(k=>localStorage.removeItem(k)); }catch(e){} location.reload(); } });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
-    $('#toggleSoundBtn').addEventListener('click', ()=>{ SFX.ui(); sfxEnabled=!sfxEnabled; $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`; });
+    $('#toggleSoundBtn').addEventListener('click', ()=>{
+      SFX.ui();
+      sfxEnabled = !sfxEnabled;
+      if(sfxEnabled) ensureAudio();
+      $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`;
+    });
 
     if(playGamesLoginBtn){
       playGamesLoginBtn.addEventListener('click', ()=>{
