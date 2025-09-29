@@ -124,7 +124,15 @@ function upgradeCostLinear(state, key) {
   const steps = Math.max(0, currentLevel - baseLevel);
   const scale = typeof cfg.costScale === 'number' ? cfg.costScale : 0;
   const exponent = typeof cfg.costExponent === 'number' ? cfg.costExponent : 1;
-  const scaled = Math.pow(1 + steps * scale, exponent);
+  const multiplier = Math.max(0, 1 + scale);
+  const stepCount = Math.max(0, steps);
+  // Upgrade costs are multiplicative: each step multiplies the base cost by
+  // `(1 + costScale)`, and the configured exponent lets us nudge the overall
+  // growth curve. For example, with a `costScale` of 0.1 and 10 steps the
+  // multiplier becomes roughly `1.1^10 ≈ 2.59`, so the final price is the base
+  // cost times ~2.6. Setting `costExponent` above 1 makes the curve steeper,
+  // while values between 0 and 1 keep it gentler.
+  const scaled = Math.pow(multiplier, stepCount * exponent);
   return Math.floor(cfg.baseCost * scaled);
 }
 
