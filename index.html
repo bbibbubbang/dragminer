@@ -1169,11 +1169,18 @@ section[id^="tab-"].active{ display:block; }
       const storedBase = (typeof state.player.atkBase === 'number') ? state.player.atkBase : 10;
       const base = Math.max(storedBase, baseFloor);
       state.player.atkBase = base;
-      const ATK_PER_LVL = 0.12;
-      const ATK_MILE    = 0.35;
-      const per   = Math.pow(1 + ATK_PER_LVL, Math.max(0, L));
-      const bonus = Math.pow(1 + ATK_MILE, Math.floor(Math.max(0, L) / 10));
-      const atk = Math.max(1, Math.ceil(base * per * bonus));
+      const fallbackMultiplier = () => {
+        const perLevel = 0.12;
+        const milestoneBonus = 0.35;
+        const milestoneStep = 10;
+        const per = Math.pow(1 + perLevel, Math.max(0, L));
+        const bonus = Math.pow(1 + milestoneBonus, Math.floor(Math.max(0, L) / milestoneStep));
+        return per * bonus;
+      };
+      const multiplier = typeof window.computeAtkMultiplier === 'function'
+        ? window.computeAtkMultiplier(L)
+        : fallbackMultiplier();
+      const atk = Math.max(1, Math.ceil(base * multiplier));
       state.player.atk = atk;
       calcCritChance();
       return atk;
