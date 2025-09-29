@@ -675,7 +675,26 @@ section[id^="tab-"].active{ display:block; }
 
     // ---------- Rebirth-only Aether ----------
     // 데이터는 data/aether.js에서 로드됩니다.
-    function perkCost(p){ return Math.floor(p.base * Math.pow(p.scale, p.getLevel(state))); }
+    function toFiniteNumber(value, fallback=0){
+      const num = Number(value);
+      return Number.isFinite(num) ? num : fallback;
+    }
+
+    function calcLinearCost(base, stepRate, level){
+      const safeBase = Math.max(0, toFiniteNumber(base, 0));
+      const safeRate = Math.max(0, toFiniteNumber(stepRate, 0));
+      const safeLevel = Math.max(0, toFiniteNumber(level, 0));
+      const multiplier = 1 + (safeRate * safeLevel);
+      return Math.floor(safeBase * multiplier);
+    }
+
+    function perkCost(p){
+      if(!p) return 0;
+      const level = typeof p.getLevel === 'function' ? toFiniteNumber(p.getLevel(state), 0) : 0;
+      const base = toFiniteNumber(p.base, 0);
+      const rate = Math.max(0, toFiniteNumber(p.scale, 0) - 1);
+      return calcLinearCost(base, rate, level);
+    }
     const rebirthPick = {}; // {key:1}
 
     // ---------- Ores ----------
@@ -1518,6 +1537,17 @@ section[id^="tab-"].active{ display:block; }
       return str;
     }
 
+    function getPassiveSkillBaseCost(sk){
+      if(!sk) return 0;
+      if(Number.isFinite(sk.aeBase)) return sk.aeBase;
+      return toFiniteNumber(sk.ae, 0);
+    }
+
+    function getPassiveSkillCost(sk, ownedLevel){
+      const base = getPassiveSkillBaseCost(sk);
+      return calcLinearCost(base, 0.10, ownedLevel);
+    }
+
     function buildPassiveStatLine(sk, level, isMaxed){
       const cfg = PASSIVE_DISPLAY_INFO[sk.key];
       if(!cfg){ return ''; }
@@ -1560,20 +1590,23 @@ section[id^="tab-"].active{ display:block; }
         const card = document.createElement('div'); card.className = 'skill-card';
         const descBlock = sk.desc ? `<div class="mono" style="opacity:.8;margin:4px 0 ${statLine?4:8}px 0">${sk.desc}</div>` : '';
         const statBlock = statLine ? `<div class="mono" style="margin:0 0 8px 0">${statLine}</div>` : '';
+        const priceValue = isMaxed ? '--' : getPassiveSkillCost(sk, ownedCount);
         const buttonLabel = isMaxed
           ? (sk.once ? '보유중' : '최대 레벨')
           : (owned ? '추가 구매' : '구매');
         const buttonDisabled = isMaxed;
-        const buttonRow = `<div class="row" style="justify-content:space-between${(!statLine && !sk.desc)?';margin-top:8px':''}"><div>가격: <b class="price">${sk.ae}</b> 에테르</div><button class="btn" ${buttonDisabled?'disabled':''}>${buttonLabel}</button></div>`;
+        const priceRow = `<div class="row" style="justify-content:space-between${(!statLine && !sk.desc)?';margin-top:8px':''}"><div>가격: <b class="price">${priceValue}</b> 에테르</div><button class="btn" ${buttonDisabled?'disabled':''}>${buttonLabel}</button></div>`;
         card.innerHTML = `<div class="row" style="justify-content:space-between"><b>${sk.name}</b><span class="mono">${levelLabel}</span></div>`+
                          descBlock +
                          statBlock +
-                         buttonRow;
+                         priceRow;
         const buyBtn = card.querySelector('.btn');
         if(buyBtn){
           buyBtn.addEventListener('click', ()=>{
             if(ownedCount >= maxLevel){ toast('최대 레벨입니다.'); SFX.deny(); return; }
-            if(!spendAe(sk.ae)) { SFX.deny(); return; }
+            const currentOwned = state.skillsOwnedPassive[sk.key] || 0;
+            const cost = getPassiveSkillCost(sk, currentOwned);
+            if(!spendAe(cost)) { SFX.deny(); return; }
             if(!state.skillsOwnedPassive[sk.key]) state.skillsOwnedPassive[sk.key]=0;
             const nextLevel = Math.min(maxLevel, state.skillsOwnedPassive[sk.key] + 1);
             state.skillsOwnedPassive[sk.key] = nextLevel;
