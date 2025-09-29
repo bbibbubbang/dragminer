@@ -37,7 +37,7 @@ const UPGRADE_CONFIG = {
   atk: {
     defaultLevel: 0,
     baseCost: 90,
-    costExponent: 1.1,
+    costExponent: 1.2,
   },
   crit: {
     defaultLevel: 0,
@@ -48,7 +48,7 @@ const UPGRADE_CONFIG = {
   spawn: {
     defaultLevel: 0,
     baseCost: 240,
-    costExponent: 1.1,
+    costExponent: 1.15,
     maxLevel: 34,
   },
   pet: {
