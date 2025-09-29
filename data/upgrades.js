@@ -38,13 +38,13 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 90,
     costScale: 0.45,
-    costExponent: 1.3,
+    costExponent: 1.2,
   },
   crit: {
     defaultLevel: 0,
     baseCost: 150,
     costScale: 0.5,
-    costExponent: 1.2,
+    costExponent: 1.1,
     effectPerLevel: 0.02,
   },
   spawn: {
@@ -58,7 +58,7 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 450,
     costScale: 0.6,
-    costExponent: 1.25,
+    costExponent: 1.1,
     maxLevel: 100,
   },
 };
