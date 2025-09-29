@@ -63,7 +63,7 @@
     .skill-card{background:#0f1430;border:1px solid #273061;border-radius:12px;padding:10px}
     .skill-card.owned-active{opacity:0.45}
     .skillbar{position:sticky;bottom:0;margin-top:8px;background:#0e1328;border:1px solid #1f2853;border-radius:12px;padding:6px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-    .skillbtn{height:44px;border-radius:10px;border:1px solid #30407a;background:#18224a;color:#dbe7ff;font-weight:800}
+    .skillbtn{height:44px;border-radius:10px;border:1px solid #30407a;background:#18224a;color:#dbe7ff;font-weight:800;touch-action:manipulation}
     .skillbtn.cd{position:relative}
     .skillbtn.cd::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.35);}
     .slotlist{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
@@ -1555,6 +1555,33 @@ section[id^="tab-"].active{ display:block; }
       }
     }
 
+    function attachSkillButtonEvents(btn, key){
+      if(!btn || !key) return;
+      const triggerSkill = ()=>{ SFX.ui(); useSkill(key); };
+      let pointerActivated = false;
+      btn.addEventListener('pointerdown', (ev)=>{
+        if(btn.disabled) return;
+        if(typeof ev.button === 'number' && ev.button !== 0) return;
+        pointerActivated = true;
+        ev.preventDefault();
+        triggerSkill();
+      }, {passive:false});
+      btn.addEventListener('pointerup', ()=>{
+        if(pointerActivated){
+          setTimeout(()=>{ pointerActivated = false; }, 0);
+        }
+      });
+      btn.addEventListener('pointercancel', ()=>{ pointerActivated = false; });
+      btn.addEventListener('click', (ev)=>{
+        if(pointerActivated){
+          ev.preventDefault();
+          pointerActivated = false;
+          return;
+        }
+        triggerSkill();
+      });
+    }
+
     function renderSkillBar(){
       syncSkillSlotsWithOwned();
       if(!state.inRun){ skillBarEl.style.display='none'; return; }
@@ -1566,7 +1593,7 @@ section[id^="tab-"].active{ display:block; }
         else {
           const cd = Math.max(0, state.skillCooldowns[k]||0);
           if(cd>0){ b.classList.add('cd'); b.textContent = `${ACTIVE_SKILLS.find(s=>s.key===k).name} (${cd.toFixed(0)}s)`; b.disabled=true; }
-          b.addEventListener('click', ()=>{ SFX.ui(); useSkill(k); });
+          attachSkillButtonEvents(b, k);
         }
         skillBarEl.appendChild(b);
       }
