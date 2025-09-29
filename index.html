@@ -51,17 +51,19 @@
     .ore-shape.shape-ingot{--ore-clip:polygon(12% 20%,88% 20%,100% 78%,0% 78%);--ore-highlight-angle:90deg;--ore-shadow-angle:270deg;border-radius:12px;}
     .ore-shape.shape-ingot::before{background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.15) 38%,rgba(255,255,255,0) 70%);}
     .ore-shape.shape-ingot::after{background:linear-gradient(180deg,rgba(15,23,42,0) 0%,rgba(15,23,42,.28) 80%);opacity:.55;}
-    .ore-shape.shape-gem{--ore-clip:polygon(50% 0%,88% 28%,72% 100%,28% 100%,12% 28%);--ore-highlight-angle:115deg;--ore-shadow-angle:300deg;}
+    .ore-shape.shape-gem{--ore-clip:polygon(50% 0%,82% 16%,100% 48%,82% 82%,50% 100%,18% 82%,0% 48%,18% 16%);--ore-highlight-angle:120deg;--ore-shadow-angle:300deg;filter:saturate(1.04);}
     .ore-shape.shape-gem::before{background:
-      linear-gradient(120deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 52%),
-      linear-gradient(45deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,0) 58%);
+      conic-gradient(from 120deg at 50% 32%,rgba(255,255,255,.6) 0deg,rgba(255,255,255,0) 110deg),
+      linear-gradient(140deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 56%),
+      linear-gradient(40deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,0) 60%);
       mix-blend-mode:screen;
-      opacity:.85;
+      opacity:.9;
     }
     .ore-shape.shape-gem::after{background:
-      linear-gradient(210deg,rgba(15,23,42,.32) 0%,rgba(15,23,42,0) 55%),
-      radial-gradient(circle at 70% 78%,rgba(15,23,42,.3),rgba(15,23,42,0) 60%);
-      opacity:.65;
+      radial-gradient(circle at 30% 68%,rgba(15,23,42,.18) 0%,rgba(15,23,42,0) 54%),
+      radial-gradient(circle at 72% 76%,rgba(15,23,42,.32) 0%,rgba(15,23,42,0) 58%),
+      linear-gradient(220deg,rgba(15,23,42,.4) 0%,rgba(15,23,42,0) 62%);
+      opacity:.68;
     }
     .ore-shape.shape-crystal{--ore-clip:polygon(50% 0%,84% 18%,100% 52%,68% 100%,32% 100%,0% 52%,16% 18%);--ore-highlight-angle:105deg;--ore-shadow-angle:285deg;filter:saturate(1.08);}
     .ore-shape.shape-crystal::before{background:linear-gradient(120deg,rgba(255,255,255,.6) 0%,rgba(255,255,255,0) 45%);opacity:.8;}
