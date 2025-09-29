@@ -2026,6 +2026,16 @@ section[id^="tab-"].active{ display:block; }
     }
     function exitRun(){ if(!state.inRun) return; bankAndExit(false); }
 
+    function isAutoChallengeActive(){
+      return !!(state.aether?.autoChallengeOwned && state.aether.autoChallengeEnabled);
+    }
+
+    function maybeStartAutoChallenge(){
+      if(state.inRun) return;
+      if(!isAutoChallengeActive()) return;
+      startRun();
+    }
+
     function bankAndExit(cleared){
       if(state.settings?.autoSell){
         let totalGold = 0;
@@ -2051,8 +2061,8 @@ section[id^="tab-"].active{ display:block; }
       renderSkillBar();
       gridRectCache = null;
       refresh();
-      if(state.aether?.autoChallengeOwned && state.aether.autoChallengeEnabled){
-        setTimeout(()=>{ startRun(); }, 250);
+      if(isAutoChallengeActive()){
+        setTimeout(()=>{ maybeStartAutoChallenge(); }, 250);
       }
     }
 
@@ -2069,6 +2079,9 @@ section[id^="tab-"].active{ display:block; }
       renderSkillBar();
       gridRectCache = null;
       refresh();
+      if(isAutoChallengeActive()){
+        setTimeout(()=>{ maybeStartAutoChallenge(); }, 0);
+      }
     }
 
     function resetGoldProgression(){
@@ -2599,10 +2612,12 @@ section[id^="tab-"].active{ display:block; }
       state.aether.autoChallengeOwned = true;
       state.aether.autoChallengeEnabled = true;
       save(); renderAether(); renderTop(); toast('자동 도전 해금!');
+      maybeStartAutoChallenge();
     });
     document.getElementById('autoChallengeChk').addEventListener('change', (e)=>{
       if(!state.aether.autoChallengeOwned){ e.target.checked=false; return; }
       state.aether.autoChallengeEnabled = e.target.checked; save();
+      if(e.target.checked){ maybeStartAutoChallenge(); }
     });
     document.addEventListener('visibilitychange', ()=>{
       if(document.hidden){
@@ -2658,6 +2673,7 @@ section[id^="tab-"].active{ display:block; }
       renderAether();
       renderTop();
       renderSkillBar();
+      maybeStartAutoChallenge();
     }
 
     async function init(){
