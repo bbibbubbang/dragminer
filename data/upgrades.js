@@ -20,23 +20,27 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 90,
     costScale: 0.45,
+    costExponent: 1.3,
   },
   crit: {
     defaultLevel: 0,
     baseCost: 150,
     costScale: 0.5,
+    costExponent: 1.2,
     effectPerLevel: 0.02,
   },
   spawn: {
     defaultLevel: 0,
     baseCost: 240,
     costScale: 0.55,
+    costExponent: 1.1,
     maxLevel: 34,
   },
   pet: {
     defaultLevel: 0,
     baseCost: 450,
     costScale: 0.6,
+    costExponent: 1.25,
     maxLevel: 100,
   },
 };
@@ -87,7 +91,9 @@ function upgradeCostLinear(state, key) {
   const baseLevel = cfg.defaultLevel || 0;
   const steps = Math.max(0, currentLevel - baseLevel);
   const scale = typeof cfg.costScale === 'number' ? cfg.costScale : 0;
-  return Math.floor(cfg.baseCost * (1 + steps * scale));
+  const exponent = typeof cfg.costExponent === 'number' ? cfg.costExponent : 1;
+  const scaled = Math.pow(1 + steps * scale, exponent);
+  return Math.floor(cfg.baseCost * scaled);
 }
 
 window.UPGRADE_INFO = [
