@@ -85,6 +85,7 @@
     .ae-balance{display:flex;align-items:center;gap:6px}
     .ae-gain{font-weight:800;color:#93c5fd;opacity:0;transition:opacity .2s ease}
     .ae-gain.show{opacity:1}
+    .hud-gain{margin-left:6px;display:inline-block;min-width:0}
 
     footer{padding:8px 0}
     #ad-container{min-height:90px;display:flex;justify-content:center;align-items:center;width:100%}
@@ -125,7 +126,7 @@ section[id^="tab-"].active{ display:block; }
 
       <div class="topbar">
         <div class="hud mono">
-          <div class="hud-line" id="hud1">💰 0 · ✨ 0</div>
+          <div class="hud-line" id="hud1">💰 <span id="hudGold">0</span> · ✨ <span id="hudEther">0</span><span id="hudAeGain" class="ae-gain hud-gain"></span></div>
           <div class="hud-line" id="hud2">🗡️ 1 · 🗼 지하 1층</div>
         </div>
         <div class="row">
@@ -757,7 +758,11 @@ section[id^="tab-"].active{ display:block; }
     const skillBarEl = $('#skillBar');
     const screenEl = $('.screen');
     const aeGainFlashEl = $('#aeGainFlash');
+    const hudGoldEl = $('#hudGold');
+    const hudEtherEl = $('#hudEther');
+    const hudAeGainEl = $('#hudAeGain');
     let aeGainFlashTimer = null;
+    let hudAeGainTimer = null;
     let gridRectCache = null;
     let lastGridRectValid = null;
     let gridSafeMargin = { x: 6, y: 6 };
@@ -1280,7 +1285,8 @@ section[id^="tab-"].active{ display:block; }
     function fmtFloor(n){ return `지하 ${n}층`; }
     function renderHud(){
       calcAtk();
-      $('#hud1').textContent = `💰 ${state.player.gold} · ✨ ${state.player.ether}`;
+      if(hudGoldEl){ hudGoldEl.textContent = state.player.gold; }
+      if(hudEtherEl){ hudEtherEl.textContent = state.player.ether; }
       $('#hud2').textContent = `🗡️ ${state.player.atk} · 🗼 ${fmtFloor(state.floor)}`;
     }
     function renderTop(){
@@ -1498,9 +1504,27 @@ section[id^="tab-"].active{ display:block; }
       $('#rebirthBuyBtn').disabled = !(canRebirth && afford && total>0);
     }
 
-    function flashAetherGain(amount){
-      if(!aeGainFlashEl) return;
+    function flashHudAetherGain(amount){
+      if(!hudAeGainEl) return;
       if(typeof amount !== 'number' || !Number.isFinite(amount)) return;
+      if(hudAeGainTimer){
+        clearTimeout(hudAeGainTimer);
+        hudAeGainTimer = null;
+      }
+      const formatted = amount > 0 ? `+${amount}` : `${amount}`;
+      hudAeGainEl.textContent = formatted;
+      hudAeGainEl.classList.add('show');
+      hudAeGainTimer = setTimeout(()=>{
+        hudAeGainEl.classList.remove('show');
+        hudAeGainEl.textContent = '';
+        hudAeGainTimer = null;
+      }, 3000);
+    }
+
+    function flashAetherGain(amount){
+      if(typeof amount !== 'number' || !Number.isFinite(amount)) return;
+      flashHudAetherGain(amount);
+      if(!aeGainFlashEl) return;
       if(aeGainFlashTimer){
         clearTimeout(aeGainFlashTimer);
         aeGainFlashTimer = null;
