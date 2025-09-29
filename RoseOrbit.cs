@@ -66,21 +66,24 @@ public class RoseOrbit : MonoBehaviour
         currentCenter = Vector3.Lerp(currentCenter, desiredCenter, lerpFactor);
 
         float adjustedTheta = theta + phase;
-        float radius = A * Mathf.Cos(k * adjustedTheta);
+        float rawRadius = A * Mathf.Cos(k * adjustedTheta);
+        float angle = adjustedTheta;
 
-        if (minAbsR > 0f)
+        if (rawRadius < 0f)
         {
-            float sign = radius >= 0f ? 1f : -1f;
-            if (Mathf.Abs(radius) < minAbsR)
-            {
-                radius = sign * minAbsR;
-            }
+            rawRadius = -rawRadius;
+            angle += Mathf.PI;
         }
 
-        float cosTheta = Mathf.Cos(adjustedTheta);
-        float sinTheta = Mathf.Sin(adjustedTheta);
+        if (minAbsR > 0f && rawRadius < minAbsR)
+        {
+            rawRadius = minAbsR;
+        }
 
-        Vector3 offset = new Vector3(radius * cosTheta, radius * sinTheta, 0f);
+        float cosTheta = Mathf.Cos(angle);
+        float sinTheta = Mathf.Sin(angle);
+
+        Vector3 offset = new Vector3(rawRadius * cosTheta, rawRadius * sinTheta, 0f);
         Vector3 newPosition = currentCenter + offset;
         newPosition.z = transform.position.z;
 
