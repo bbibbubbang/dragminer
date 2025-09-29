@@ -37,27 +37,23 @@ const UPGRADE_CONFIG = {
   atk: {
     defaultLevel: 0,
     baseCost: 90,
-    costScale: 0.45,
     costExponent: 1.1,
   },
   crit: {
     defaultLevel: 0,
     baseCost: 150,
-    costScale: 0.5,
     costExponent: 1.1,
     effectPerLevel: 0.02,
   },
   spawn: {
     defaultLevel: 0,
     baseCost: 240,
-    costScale: 0.55,
     costExponent: 1.1,
     maxLevel: 34,
   },
   pet: {
     defaultLevel: 0,
     baseCost: 450,
-    costScale: 0.6,
     costExponent: 1.1,
     maxLevel: 100,
   },
@@ -137,17 +133,15 @@ function upgradeCostLinear(state, key) {
   const currentLevel = getUpgradeLevel(state, key);
   const baseLevel = Math.max(0, Math.floor(cfg.defaultLevel || 0));
   const steps = Math.max(0, currentLevel - baseLevel);
-  const scale = typeof cfg.costScale === 'number' ? cfg.costScale : 0;
   const exponent = typeof cfg.costExponent === 'number' ? cfg.costExponent : 1;
-  const multiplier = Math.max(0, 1 + scale);
+  const baseMultiplier = Number.isFinite(exponent) && exponent > 0 ? exponent : 1;
   const stepCount = Math.max(0, steps);
-  // Upgrade costs are multiplicative: each step multiplies the base cost by
-  // `(1 + costScale)`, and the configured exponent lets us nudge the overall
-  // growth curve. For example, with a `costScale` of 0.1 and 10 steps the
-  // multiplier becomes roughly `1.1^10 ≈ 2.59`, so the final price is the base
-  // cost times ~2.6. Setting `costExponent` above 1 makes the curve steeper,
-  // while values between 0 and 1 keep it gentler.
-  const scaled = Math.pow(multiplier, stepCount * exponent);
+  // Upgrade costs grow multiplicatively: each level multiplies the base cost by
+  // the configured `costExponent`. With the default exponent of `1.1`, ten
+  // levels would cost `baseCost * 1.1^10 ≈ baseCost * 2.59`. Raising the
+  // exponent makes prices scale faster, while values between 0 and 1 make the
+  // curve gentler.
+  const scaled = Math.pow(baseMultiplier, stepCount);
   return Math.floor(cfg.baseCost * scaled);
 }
 
