@@ -873,8 +873,8 @@ section[id^="tab-"].active{ display:block; }
       if(!ore) return;
       ore.x = clampAxisValue(ore.x, axisX);
       ore.y = clampAxisValue(ore.y, axisY);
-      const gridWidth = axisX?.size ?? gridRectCache?.width ?? lastGridRectValid?.width ?? ORE_SIZE;
-      const gridHeight = axisY?.size ?? gridRectCache?.height ?? lastGridRectValid?.height ?? ORE_SIZE;
+      const gridWidth = axisX?.size ?? gridRectCache?.innerWidth ?? gridRectCache?.width ?? lastGridRectValid?.innerWidth ?? lastGridRectValid?.width ?? ORE_SIZE;
+      const gridHeight = axisY?.size ?? gridRectCache?.innerHeight ?? gridRectCache?.height ?? lastGridRectValid?.innerHeight ?? lastGridRectValid?.height ?? ORE_SIZE;
       const availableX = Math.max(0, gridWidth - ORE_SIZE);
       const availableY = Math.max(0, gridHeight - ORE_SIZE);
       const marginX = Number.isFinite(axisX?.margin) ? axisX.margin : Math.min(GRID_SAFE_MARGIN, availableX / 2);
@@ -889,8 +889,8 @@ section[id^="tab-"].active{ display:block; }
 
     function clampPetToGrid(pet, axisX, axisY){
       if(!pet) return;
-      const gridWidth = axisX?.size ?? gridRectCache?.width ?? lastGridRectValid?.width ?? PET_SIZE;
-      const gridHeight = axisY?.size ?? gridRectCache?.height ?? lastGridRectValid?.height ?? PET_SIZE;
+      const gridWidth = axisX?.size ?? gridRectCache?.innerWidth ?? gridRectCache?.width ?? lastGridRectValid?.innerWidth ?? lastGridRectValid?.width ?? PET_SIZE;
+      const gridHeight = axisY?.size ?? gridRectCache?.innerHeight ?? gridRectCache?.height ?? lastGridRectValid?.innerHeight ?? lastGridRectValid?.height ?? PET_SIZE;
       const marginX = Number.isFinite(axisX?.margin) ? axisX.margin : Math.min(GRID_SAFE_MARGIN, Math.max(0, (gridWidth - PET_SIZE) / 2));
       const marginY = Number.isFinite(axisY?.margin) ? axisY.margin : Math.min(GRID_SAFE_MARGIN, Math.max(0, (gridHeight - PET_SIZE) / 2));
       const minCenterX = Number.isFinite(axisX?.min) ? axisX.min : PET_RADIUS + marginX;
@@ -1114,20 +1114,24 @@ section[id^="tab-"].active{ display:block; }
     }
     function gridRect(){
       const r = gridEl.getBoundingClientRect();
-      const hasSize = (r.width || 0) > 0 && (r.height || 0) > 0;
+      const innerWidth = Math.max(0, gridEl ? (gridEl.clientWidth || 0) : (r.width || 0));
+      const innerHeight = Math.max(0, gridEl ? (gridEl.clientHeight || 0) : (r.height || 0));
+      const hasSize = innerWidth > 0 && innerHeight > 0;
       if(hasSize){
         const newMargins = computeGridSafeMargins();
         if(gridRectCache){
-          const widthChanged = Math.abs(gridRectCache.width - r.width) > 0.5;
-          const heightChanged = Math.abs(gridRectCache.height - r.height) > 0.5;
+          const prevInnerWidth = Number.isFinite(gridRectCache.innerWidth) ? gridRectCache.innerWidth : (gridRectCache.width || 0);
+          const prevInnerHeight = Number.isFinite(gridRectCache.innerHeight) ? gridRectCache.innerHeight : (gridRectCache.height || 0);
+          const widthChanged = Math.abs(prevInnerWidth - innerWidth) > 0.5 || Math.abs((gridRectCache.width || 0) - (r.width || 0)) > 0.5;
+          const heightChanged = Math.abs(prevInnerHeight - innerHeight) > 0.5 || Math.abs((gridRectCache.height || 0) - (r.height || 0)) > 0.5;
           if(widthChanged || heightChanged){
             const prev = gridRectCache;
             const prevMarginX = Number.isFinite(prev.marginX) ? prev.marginX : newMargins.x;
             const prevMarginY = Number.isFinite(prev.marginY) ? prev.marginY : newMargins.y;
-            const oldAxisX = spawnAxisInfo(prev.width, prevMarginX);
-            const oldAxisY = spawnAxisInfo(prev.height, prevMarginY);
-            const newAxisX = spawnAxisInfo(r.width, newMargins.x);
-            const newAxisY = spawnAxisInfo(r.height, newMargins.y);
+            const oldAxisX = spawnAxisInfo(prevInnerWidth, prevMarginX);
+            const oldAxisY = spawnAxisInfo(prevInnerHeight, prevMarginY);
+            const newAxisX = spawnAxisInfo(innerWidth, newMargins.x);
+            const newAxisY = spawnAxisInfo(innerHeight, newMargins.y);
             const oldInnerW = Math.max(1, oldAxisX.span || 0);
             const oldInnerH = Math.max(1, oldAxisY.span || 0);
             for(let i=0;i<state.grid.length;i++){
@@ -1139,10 +1143,10 @@ section[id^="tab-"].active{ display:block; }
               ore.y = newAxisY.start + ny * (newAxisY.span || 0);
               clampOreToGrid(ore, newAxisX, newAxisY);
             }
-            const oldPetAxisX = spawnAxisInfo(prev.width, prevMarginX, PET_SIZE);
-            const oldPetAxisY = spawnAxisInfo(prev.height, prevMarginY, PET_SIZE);
-            const newPetAxisX = spawnAxisInfo(r.width, newMargins.x, PET_SIZE);
-            const newPetAxisY = spawnAxisInfo(r.height, newMargins.y, PET_SIZE);
+            const oldPetAxisX = spawnAxisInfo(prevInnerWidth, prevMarginX, PET_SIZE);
+            const oldPetAxisY = spawnAxisInfo(prevInnerHeight, prevMarginY, PET_SIZE);
+            const newPetAxisX = spawnAxisInfo(innerWidth, newMargins.x, PET_SIZE);
+            const newPetAxisY = spawnAxisInfo(innerHeight, newMargins.y, PET_SIZE);
             for(const pet of state.pets){
               const oldSpanX = oldPetAxisX.span || 0;
               const oldSpanY = oldPetAxisY.span || 0;
@@ -1163,6 +1167,8 @@ section[id^="tab-"].active{ display:block; }
           height:r.height,
           right:r.right,
           bottom:r.bottom,
+          innerWidth,
+          innerHeight,
           marginX:newMargins.x,
           marginY:newMargins.y
         };
@@ -1190,6 +1196,8 @@ section[id^="tab-"].active{ display:block; }
         height:ORE_SIZE,
         right:r.left + ORE_SIZE,
         bottom:r.top + ORE_SIZE,
+        innerWidth:ORE_SIZE,
+        innerHeight:ORE_SIZE,
         marginX:fallbackMargins.x,
         marginY:fallbackMargins.y
       };
@@ -1304,8 +1312,10 @@ section[id^="tab-"].active{ display:block; }
     function renderGrid(){ gridEl.innerHTML='';
       const gr = gridRect();
       const margins = currentGridMargins();
-      const axisX = spawnAxisInfo(gr.width, margins.x);
-      const axisY = spawnAxisInfo(gr.height, margins.y);
+      const gridWidth = Math.max(0, (gr.innerWidth ?? gr.width) || 0);
+      const gridHeight = Math.max(0, (gr.innerHeight ?? gr.height) || 0);
+      const axisX = spawnAxisInfo(gridWidth, margins.x);
+      const axisY = spawnAxisInfo(gridHeight, margins.y);
       for(let i=0;i<25;i++){
         const ore = state.grid[i];
         if(!ore) continue;
@@ -1315,8 +1325,8 @@ section[id^="tab-"].active{ display:block; }
         el.style.background=ore.bg;
         let localX = ore.x - ORE_RADIUS;
         let localY = ore.y - ORE_RADIUS;
-        const maxLeft = Math.max(0, gr.width - ORE_SIZE);
-        const maxTop = Math.max(0, gr.height - ORE_SIZE);
+        const maxLeft = Math.max(0, gridWidth - ORE_SIZE);
+        const maxTop = Math.max(0, gridHeight - ORE_SIZE);
         const minLeft = Math.max(0, (axisX?.min ?? axisX?.start ?? ORE_RADIUS) - ORE_RADIUS);
         const minTop = Math.max(0, (axisY?.min ?? axisY?.start ?? ORE_RADIUS) - ORE_RADIUS);
         const safeLeft = Math.min(Math.max(minLeft, (axisX?.max ?? axisX?.start ?? ORE_RADIUS) - ORE_RADIUS), maxLeft);
@@ -1928,7 +1938,9 @@ section[id^="tab-"].active{ display:block; }
           break;
         }
         case 'sonic':
-          const gr = gridRect(); const cx = gr.width/2, cy = gr.height/2;
+          const gr = gridRect();
+          const cx = Math.max(0, (gr.innerWidth ?? gr.width) || 0) / 2;
+          const cy = Math.max(0, (gr.innerHeight ?? gr.height) || 0) / 2;
           const idx = findNearestOreIdx(cx,cy);
           if(idx>=0){
             const o=state.grid[idx];
@@ -2159,8 +2171,10 @@ section[id^="tab-"].active{ display:block; }
       const value = Math.round(base.value*floorValMul());
       const gr = gridRect();
       const margins = currentGridMargins();
-      const axisX = spawnAxisInfo(gr.width, margins.x);
-      const axisY = spawnAxisInfo(gr.height, margins.y);
+      const gridWidth = Math.max(0, (gr.innerWidth ?? gr.width) || 0);
+      const gridHeight = Math.max(0, (gr.innerHeight ?? gr.height) || 0);
+      const axisX = spawnAxisInfo(gridWidth, margins.x);
+      const axisY = spawnAxisInfo(gridHeight, margins.y);
       const ore = {
         type: base.key,
         label: base.name,
@@ -2182,8 +2196,10 @@ section[id^="tab-"].active{ display:block; }
         const hp = etherHpForFloor();
         const gr = gridRect();
         const margins = currentGridMargins();
-        const axisX = spawnAxisInfo(gr.width, margins.x);
-        const axisY = spawnAxisInfo(gr.height, margins.y);
+        const gridWidth = Math.max(0, (gr.innerWidth ?? gr.width) || 0);
+        const gridHeight = Math.max(0, (gr.innerHeight ?? gr.height) || 0);
+        const axisX = spawnAxisInfo(gridWidth, margins.x);
+        const axisY = spawnAxisInfo(gridHeight, margins.y);
         const ore = {
           type:'EtherOre',
           label:'에테르 광석',
@@ -2259,8 +2275,8 @@ section[id^="tab-"].active{ display:block; }
       const baseCount = getUpgradeLevel(state, 'pet') + (state.passive.petPlus || 0);
       const specialCount = Math.max(0, state.aether?.petPlus || 0);
       const gr = gridRect();
-      const width = Math.max(0, gr.width || 0);
-      const height = Math.max(0, gr.height || 0);
+      const width = Math.max(0, (gr.innerWidth ?? gr.width) || 0);
+      const height = Math.max(0, (gr.innerHeight ?? gr.height) || 0);
       const margins = currentGridMargins();
       const petAxisX = spawnAxisInfo(width, margins.x, PET_SIZE);
       const petAxisY = spawnAxisInfo(height, margins.y, PET_SIZE);
@@ -2331,8 +2347,10 @@ section[id^="tab-"].active{ display:block; }
       gridEl.querySelectorAll('.pet').forEach(p=>p.remove());
       const gr = gridRect();
       const margins = currentGridMargins();
-      const axisX = spawnAxisInfo(gr.width, margins.x, PET_SIZE);
-      const axisY = spawnAxisInfo(gr.height, margins.y, PET_SIZE);
+      const gridWidth = Math.max(0, (gr.innerWidth ?? gr.width) || 0);
+      const gridHeight = Math.max(0, (gr.innerHeight ?? gr.height) || 0);
+      const axisX = spawnAxisInfo(gridWidth, margins.x, PET_SIZE);
+      const axisY = spawnAxisInfo(gridHeight, margins.y, PET_SIZE);
       for(const p of state.pets){
         clampPetToGrid(p, axisX, axisY);
         const el=document.createElement('div');
@@ -2393,8 +2411,8 @@ section[id^="tab-"].active{ display:block; }
 
     function updatePetOrbitMotion(p, ore, dt, ts, gr, axisX, axisY){
       if(!p || !ore) return;
-      const gridWidth = Math.max(gr.width || 0, 16);
-      const gridHeight = Math.max(gr.height || 0, 16);
+      const gridWidth = Math.max(axisX?.size || gr.innerWidth || gr.width || 0, 16);
+      const gridHeight = Math.max(axisY?.size || gr.innerHeight || gr.height || 0, 16);
       const maxRadius = Math.max(ORE_RADIUS + 8, Number.isFinite(p.maxRadius) ? p.maxRadius : PET.swingRadius);
       const followBase = Number.isFinite(p.followStrength) ? p.followStrength : (PET.moveSpeed / 24);
       const followStrength = Math.max(3, followBase);
@@ -2445,8 +2463,8 @@ section[id^="tab-"].active{ display:block; }
       p.prevRadial = radial;
     }
     function updatePetIdleMotion(p, dt, gr, axisX, axisY){
-      const gridWidth = Math.max(gr.width || 0, 16);
-      const gridHeight = Math.max(gr.height || 0, 16);
+      const gridWidth = Math.max(axisX?.size || gr.innerWidth || gr.width || 0, 16);
+      const gridHeight = Math.max(axisY?.size || gr.innerHeight || gr.height || 0, 16);
       const minDimension = Math.min(gridWidth, gridHeight);
       const centerX = gridWidth / 2;
       const centerY = gridHeight / 2;
@@ -2494,8 +2512,10 @@ section[id^="tab-"].active{ display:block; }
       }
       const gr = gridRect();
       const margins = currentGridMargins();
-      const petAxisX = spawnAxisInfo(gr.width, margins.x, PET_SIZE);
-      const petAxisY = spawnAxisInfo(gr.height, margins.y, PET_SIZE);
+      const gridWidth = Math.max(0, (gr.innerWidth ?? gr.width) || 0);
+      const gridHeight = Math.max(0, (gr.innerHeight ?? gr.height) || 0);
+      const petAxisX = spawnAxisInfo(gridWidth, margins.x, PET_SIZE);
+      const petAxisY = spawnAxisInfo(gridHeight, margins.y, PET_SIZE);
       const dt = Math.min(0.05,(ts - state.lastAnimTs)/1000 || 0.016);
       state.lastAnimTs = ts;
       const oreIndices = [];

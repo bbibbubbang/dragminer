@@ -213,7 +213,8 @@ window.UPGRADE_INFO = [
           ? state.currentSpawnIntervalMs
           : current;
         const diff = Math.abs(active - current);
-        if(diff > 1){
+        const hasteActive = !!(state.runFlags && state.runFlags.hasteActive);
+        if(!hasteActive && diff > 1){
           desc += ` (실제: ${formatSeconds(active)}초)`;
         }
       }
