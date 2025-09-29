@@ -544,6 +544,8 @@ section[id^="tab-"].active{ display:block; }
       skillHasteUntil: 0,
       skillAtkBuffUntil: 0,
 
+      currentSpawnIntervalMs: 0,
+
       // Passive bonuses
       passive: { sellBonus: 0, petPlus: 0, berserkUnlimit:false },
 
@@ -604,6 +606,14 @@ section[id^="tab-"].active{ display:block; }
     ensurePassiveDefaults();
     ensureSkillAutoDefaults();
     resetRunFlags();
+
+    state.currentSpawnIntervalMs = (() => {
+      const level = getUpgradeLevel(state, 'spawn');
+      if(typeof window.spawnIntervalForLevel === 'function'){
+        return window.spawnIntervalForLevel(level);
+      }
+      return Math.max(600, 2200 * Math.pow(0.94, level));
+    })();
 
     // ---------- Save/Load (stable key + migration) ----------
     function save(){
@@ -2015,13 +2025,22 @@ section[id^="tab-"].active{ display:block; }
       startTick();
     }
 
-    function restartSpawnTimer(){
+    function getBaseSpawnIntervalMs(){
       const level = getUpgradeLevel(state, 'spawn');
-      const baseInterval = (typeof window.spawnIntervalForLevel === 'function')
-        ? window.spawnIntervalForLevel(level)
-        : Math.max(600, 2200 * Math.pow(0.94, level));
+      if(typeof window.spawnIntervalForLevel === 'function'){
+        return window.spawnIntervalForLevel(level);
+      }
+      return Math.max(600, 2200 * Math.pow(0.94, level));
+    }
+
+    function restartSpawnTimer(){
+      const baseInterval = getBaseSpawnIntervalMs();
       let interval = baseInterval;
-      if(state.skillHasteUntil > performance.now()) interval *= 0.5;
+      const now = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+        ? performance.now()
+        : Date.now();
+      if(state.skillHasteUntil > now) interval *= 0.5;
+      state.currentSpawnIntervalMs = interval;
       clearInterval(state.timers.spawn); state.timers.spawn = setInterval(spawnOre, interval);
     }
     function exitRun(){ if(!state.inRun) return; bankAndExit(false); }
@@ -2047,6 +2066,7 @@ section[id^="tab-"].active{ display:block; }
       setRunTime(0);
       state.pets=[]; state.lastAnimTs=0; state.grid = new Array(25).fill(null);
       if(cleared){ state.floor++; if(state.floor>state.highestFloor) state.highestFloor=state.floor; }
+      state.currentSpawnIntervalMs = getBaseSpawnIntervalMs();
       save();
       renderSkillBar();
       gridRectCache = null;
@@ -2066,6 +2086,7 @@ section[id^="tab-"].active{ display:block; }
       state.lastAnimTs = 0;
       state.grid = new Array(25).fill(null);
       setRunTime(0);
+      state.currentSpawnIntervalMs = getBaseSpawnIntervalMs();
       renderSkillBar();
       gridRectCache = null;
       refresh();

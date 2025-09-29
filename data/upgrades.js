@@ -203,7 +203,24 @@ window.UPGRADE_INFO = [
       const delta = current - next;
       const hasNext = !max || level < max;
       const suffix = hasNext && delta > 0 ? ` (-${(delta / 1000).toFixed(2)})` : '';
-      return `현재 생성 간격: ${(current / 1000).toFixed(2)}초${suffix}`;
+      const formatSeconds = (ms) => {
+        if(typeof ms !== 'number' || !Number.isFinite(ms)) return '--';
+        return (ms / 1000).toFixed(2);
+      };
+      let desc = `현재 생성 간격: ${formatSeconds(current)}초${suffix}`;
+      if(state && state.inRun){
+        const active = (typeof state.currentSpawnIntervalMs === 'number' && Number.isFinite(state.currentSpawnIntervalMs))
+          ? state.currentSpawnIntervalMs
+          : current;
+        const diff = Math.abs(active - current);
+        if(diff > 1){
+          const hasteNote = state?.runFlags?.hasteActive ? ', 가속 효과 적용중' : '';
+          desc += ` (실제: ${formatSeconds(active)}초${hasteNote})`;
+        } else if(state?.runFlags?.hasteActive){
+          desc += ' (가속 효과 적용중)';
+        }
+      }
+      return desc;
     },
     getCost: (state) => upgradeCostLinear(state, 'spawn'),
     canBuy: (state) => {
