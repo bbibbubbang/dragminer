@@ -35,10 +35,39 @@
     #tab-dungeon{flex:1;display:flex;flex-direction:column;overflow:hidden}
     .grid-wrap{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
     .grid{position:relative;background:#0e1328;padding:6px;border-radius:16px;border:1px solid #202a51;touch-action: none;flex:1}
-    .ore{position:absolute;width:52px;height:52px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#0a0e1e;text-shadow:0 1px 0 rgba(255,255,255,.2);}
+    .ore{position:absolute;width:52px;height:52px;display:flex;align-items:center;justify-content:center;}
     .ore .name{display:none}
+    .ore .hp{z-index:3}
     .hp{position:absolute;top:6px;left:6px;right:6px;height:8px;background:rgba(0,0,0,.35);border-radius:999px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .hp>div{height:100%;background:linear-gradient(90deg,#34d399,#f59e0b);width:100%}
+
+    .ore-shape{position:absolute;inset:0;border-radius:16px;--ore-clip:inset(0% round 16px);clip-path:var(--ore-clip);transition:transform .16s ease,filter .16s ease;transform:scale(1);}
+    .ore-shape::before,.ore-shape::after{content:'';position:absolute;inset:0;clip-path:var(--ore-clip);pointer-events:none;}
+    .ore-shape::before{background:linear-gradient(var(--ore-highlight-angle,135deg),rgba(255,255,255,.5),rgba(255,255,255,0) 60%);mix-blend-mode:screen;opacity:.75;}
+    .ore-shape::after{background:linear-gradient(var(--ore-shadow-angle,315deg),rgba(15,23,42,.3),rgba(15,23,42,0) 55%);mix-blend-mode:multiply;opacity:.6;}
+    .ore:hover .ore-shape{transform:scale(1.04);}
+
+    .ore-shape.shape-rock{--ore-clip:polygon(14% 8%,83% 2%,100% 42%,82% 94%,20% 100%,2% 58%);--ore-highlight-angle:140deg;--ore-shadow-angle:320deg;filter:saturate(.92);}
+    .ore-shape.shape-ingot{--ore-clip:polygon(12% 20%,88% 20%,100% 78%,0% 78%);--ore-highlight-angle:90deg;--ore-shadow-angle:270deg;border-radius:12px;}
+    .ore-shape.shape-ingot::before{background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.15) 38%,rgba(255,255,255,0) 70%);}
+    .ore-shape.shape-ingot::after{background:linear-gradient(180deg,rgba(15,23,42,0) 0%,rgba(15,23,42,.28) 80%);opacity:.55;}
+    .ore-shape.shape-gem{--ore-clip:polygon(50% 0%,88% 28%,72% 100%,28% 100%,12% 28%);--ore-highlight-angle:115deg;--ore-shadow-angle:300deg;}
+    .ore-shape.shape-gem::before{background:
+      linear-gradient(120deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 52%),
+      linear-gradient(45deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,0) 58%);
+      mix-blend-mode:screen;
+      opacity:.85;
+    }
+    .ore-shape.shape-gem::after{background:
+      linear-gradient(210deg,rgba(15,23,42,.32) 0%,rgba(15,23,42,0) 55%),
+      radial-gradient(circle at 70% 78%,rgba(15,23,42,.3),rgba(15,23,42,0) 60%);
+      opacity:.65;
+    }
+    .ore-shape.shape-crystal{--ore-clip:polygon(50% 0%,84% 18%,100% 52%,68% 100%,32% 100%,0% 52%,16% 18%);--ore-highlight-angle:105deg;--ore-shadow-angle:285deg;filter:saturate(1.08);}
+    .ore-shape.shape-crystal::before{background:linear-gradient(120deg,rgba(255,255,255,.6) 0%,rgba(255,255,255,0) 45%);opacity:.8;}
+    .ore-shape.shape-crystal::after{background:linear-gradient(310deg,rgba(15,23,42,.35) 0%,rgba(15,23,42,0) 60%);opacity:.62;}
+    .ore-shape.shape-ether{--ore-clip:polygon(24% 10%,76% 10%,100% 50%,76% 90%,24% 90%,0% 50%);--ore-highlight-angle:90deg;--ore-shadow-angle:270deg;animation:ether-glow 2.4s ease-in-out infinite;}
+    @keyframes ether-glow{0%,100%{filter:drop-shadow(0 0 6px rgba(168,85,247,.55));opacity:.95;}50%{filter:drop-shadow(0 0 14px rgba(216,180,254,.85));opacity:1;}}
     .dmg{position:absolute;pointer-events:none;font-weight:900;animation:float .6s ease-out forwards;white-space:nowrap;color:#fdf7d8;-webkit-text-stroke:1.2px rgba(10,14,30,0.85);text-shadow:0 0 6px rgba(10,14,30,0.9),0 0 18px rgba(10,14,30,0.75);letter-spacing:0.5px}
     .dmg.crit{color:#ffd1dc;-webkit-text-stroke:1.2px rgba(64,0,32,0.9);text-shadow:0 0 10px rgba(255,82,115,0.75),0 0 20px rgba(10,14,30,0.8)}
     @keyframes float{to{transform:translateY(-24px);opacity:0}}
@@ -242,17 +271,17 @@ section[id^="tab-"].active{ display:block; }
   (()=>{
 
     const ORES = [
-      { key:'Stone',    name:'석재',     color:'#a3a3a3', hp:  60, value: 10,   tier:1 },
-      { key:'Copper',   name:'구리',     color:'#ef9a9a', hp: 120, value: 20,   tier:1 },
-      { key:'Iron',     name:'철',       color:'#90caf9', hp: 220, value: 40,   tier:2 },
-      { key:'Silver',   name:'은',       color:'#cfd8dc', hp: 380, value: 90,   tier:3 },
-      { key:'Gold',     name:'금',       color:'#f6e05e', hp: 650, value: 200,  tier:3 },
-      { key:'Platinum', name:'백금',     color:'#e5e7eb', hp: 900, value: 320,  tier:4 },
-      { key:'Sapphire', name:'사파이어', color:'#60a5fa', hp:1200, value: 480,  tier:4 },
-      { key:'Ruby',     name:'루비',     color:'#f43f5e', hp:1400, value: 600,  tier:5 },
-      { key:'Emerald',  name:'에메랄드', color:'#34d399', hp:1650, value: 800,  tier:5 },
-      { key:'Mythril',  name:'미스릴',   color:'#93c5fd', hp:2200, value:1200, tier:6 },
-      { key:'Diamond',  name:'다이아몬드', color:'#b9f6ff', hp:3000, value:1800, tier:6 }
+      { key:'Stone',    name:'석재',     color:'#a3a3a3', hp:  60, value: 10,   tier:1, shape:'rock' },
+      { key:'Copper',   name:'구리',     color:'#ef9a9a', hp: 120, value: 20,   tier:1, shape:'ingot' },
+      { key:'Iron',     name:'철',       color:'#90caf9', hp: 220, value: 40,   tier:2, shape:'ingot' },
+      { key:'Silver',   name:'은',       color:'#cfd8dc', hp: 380, value: 90,   tier:3, shape:'ingot' },
+      { key:'Gold',     name:'금',       color:'#f6e05e', hp: 650, value: 200,  tier:3, shape:'ingot' },
+      { key:'Platinum', name:'백금',     color:'#e5e7eb', hp: 900, value: 320,  tier:4, shape:'ingot' },
+      { key:'Sapphire', name:'사파이어', color:'#60a5fa', hp:1200, value: 480,  tier:4, shape:'gem' },
+      { key:'Ruby',     name:'루비',     color:'#f43f5e', hp:1400, value: 600,  tier:5, shape:'gem' },
+      { key:'Emerald',  name:'에메랄드', color:'#34d399', hp:1650, value: 800,  tier:5, shape:'gem' },
+      { key:'Mythril',  name:'미스릴',   color:'#93c5fd', hp:2200, value:1200, tier:6, shape:'crystal' },
+      { key:'Diamond',  name:'다이아몬드', color:'#b9f6ff', hp:3000, value:1800, tier:6, shape:'gem' }
     ];
     window.ORE_DATA = ORES;
     const ORE_BY_KEY = new Map(ORES.map(ore=>[ore.key, ore]));
@@ -322,6 +351,7 @@ section[id^="tab-"].active{ display:block; }
       const visuals = computeOreVisuals(def.color, def.value);
       ore.bg = visuals.background;
       ore.glow = visuals.glow;
+      ore.shape = def.shape || null;
     }
     const SPAWN_COLUMN_MAP = {
       '석재':'Stone',
@@ -1392,12 +1422,25 @@ section[id^="tab-"].active{ display:block; }
         clampOreToGrid(ore, axisX, axisY);
         const el = document.createElement('div');
         el.className='ore';
-        el.style.background=ore.bg;
-        if(ore.glow){
-          el.style.boxShadow = ore.glow;
-        }else{
-          el.style.boxShadow = '';
+        el.dataset.type = ore.type;
+        const shapeEl = document.createElement('div');
+        shapeEl.className = 'ore-shape';
+        const oreInfo = ore.type === 'EtherOre' ? null : ORE_BY_KEY.get(ore.type);
+        const shapeKey = ore.type === 'EtherOre' ? 'ether' : (ore.shape || oreInfo?.shape || null);
+        if(shapeKey){
+          shapeEl.classList.add(`shape-${shapeKey}`);
         }
+        shapeEl.style.background = ore.bg || '';
+        if(ore.glow){
+          shapeEl.style.boxShadow = ore.glow;
+        }else{
+          shapeEl.style.boxShadow = '';
+        }
+        const nameEl = document.createElement('span');
+        nameEl.className = 'name';
+        nameEl.textContent = ore.label || oreInfo?.name || ore.type;
+        shapeEl.appendChild(nameEl);
+        el.appendChild(shapeEl);
         let localX = ore.x - ORE_RADIUS;
         let localY = ore.y - ORE_RADIUS;
         const maxLeft = Math.max(0, gridWidth - ORE_SIZE);
