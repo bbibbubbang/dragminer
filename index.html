@@ -708,12 +708,14 @@ section[id^="tab-"].active{ display:block; }
       return Math.floor(safeBase * multiplier);
     }
 
+    const REBIRTH_COST_GROWTH = 1.2;
+
     function perkCost(p){
       if(!p) return 0;
-      const level = typeof p.getLevel === 'function' ? toFiniteNumber(p.getLevel(state), 0) : 0;
-      const base = toFiniteNumber(p.base, 0);
-      const rate = Math.max(0, toFiniteNumber(p.scale, 0) - 1);
-      return calcLinearCost(base, rate, level);
+      const level = Math.max(0, typeof p.getLevel === 'function' ? toFiniteNumber(p.getLevel(state), 0) : 0);
+      const base = Math.max(0, toFiniteNumber(p.base, 0));
+      const multiplier = Math.pow(REBIRTH_COST_GROWTH, level);
+      return Math.floor(base * multiplier);
     }
     const rebirthPick = {}; // {key:1}
 
