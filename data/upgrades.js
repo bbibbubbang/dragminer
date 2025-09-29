@@ -214,10 +214,7 @@ window.UPGRADE_INFO = [
           : current;
         const diff = Math.abs(active - current);
         if(diff > 1){
-          const hasteNote = state?.runFlags?.hasteActive ? ', 가속 효과 적용중' : '';
-          desc += ` (실제: ${formatSeconds(active)}초${hasteNote})`;
-        } else if(state?.runFlags?.hasteActive){
-          desc += ' (가속 효과 적용중)';
+          desc += ` (실제: ${formatSeconds(active)}초)`;
         }
       }
       return desc;
