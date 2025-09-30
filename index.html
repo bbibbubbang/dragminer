@@ -251,6 +251,12 @@ section[id^="tab-"].active{ display:block; }
           <button id="toggleSoundBtn" class="btn ghost">효과음: 켜짐</button>
           <button id="resetBtn" class="btn danger">초기화</button>
         </div>
+        <div class="settings-card">
+          <h4>표시 설정</h4>
+          <div class="row" style="flex-wrap:wrap;gap:10px">
+            <button id="toggleDamageBtn" class="btn ghost">데미지 표시: 켜짐</button>
+          </div>
+        </div>
         <div class="settings-card" id="playGamesCard">
           <div class="row" style="justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
             <div>
@@ -655,7 +661,7 @@ section[id^="tab-"].active{ display:block; }
       runFlags: { berserkBoostActive:false, berserkBoostPrevExpiry:null, hasteActive:false },
 
       // Settings
-      settings: { autoSell:false },
+      settings: { autoSell:false, showDamageNumbers:true },
 
       lastTickReal: 0,
       visibilityPauseTs: 0,
@@ -679,6 +685,15 @@ section[id^="tab-"].active{ display:block; }
           state.skillAuto[sk.autoToggleKey] = false;
         }
       }
+    }
+
+    function ensureSettingsDefaults(){
+      if(!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)){
+        state.settings = { autoSell:false, showDamageNumbers:true };
+        return;
+      }
+      if(typeof state.settings.autoSell !== 'boolean') state.settings.autoSell = false;
+      if(typeof state.settings.showDamageNumbers !== 'boolean') state.settings.showDamageNumbers = true;
     }
 
     function resetRunFlags(){
@@ -707,6 +722,7 @@ section[id^="tab-"].active{ display:block; }
 
     ensurePassiveDefaults();
     ensureSkillAutoDefaults();
+    ensureSettingsDefaults();
     resetRunFlags();
 
     state.currentSpawnIntervalMs = (() => {
@@ -773,6 +789,7 @@ section[id^="tab-"].active{ display:block; }
           delete state.aether.autoAdvanceEnabled;
         }
         state.settings = s.settings || state.settings;
+        ensureSettingsDefaults();
         ensurePassiveDefaults();
         ensureSkillAutoDefaults();
         resetRunFlags();
@@ -2418,7 +2435,8 @@ section[id^="tab-"].active{ display:block; }
       if(!alive){ onOreBroken(idx, ore); renderTop(); }
       renderGrid();
       const cell = state.grid[idx]?.el;
-      if(alive && cell){ const dm = document.createElement('div'); dm.classList.add('dmg'); if(crit) dm.classList.add('crit'); dm.textContent = (crit?'CRIT ':'') + '-' + dmg; dm.style.left='50%'; dm.style.top='38%'; dm.style.transform='translateX(-50%)'; cell.appendChild(dm); setTimeout(()=>dm.remove(), 520); }
+      const canShowDamage = !state.settings || state.settings.showDamageNumbers !== false;
+      if(alive && cell && canShowDamage){ const dm = document.createElement('div'); dm.classList.add('dmg'); if(crit) dm.classList.add('crit'); dm.textContent = (crit?'CRIT ':'') + '-' + dmg; dm.style.left='50%'; dm.style.top='38%'; dm.style.transform='translateX(-50%)'; cell.appendChild(dm); setTimeout(()=>dm.remove(), 520); }
       (crit?SFX.crit:SFX.hit)();
     }
 
@@ -2804,6 +2822,25 @@ section[id^="tab-"].active{ display:block; }
       $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`;
     });
 
+    const toggleDamageBtn = document.getElementById('toggleDamageBtn');
+    function updateDamageToggleText(){
+      if(!toggleDamageBtn) return;
+      const enabled = !!(state.settings && state.settings.showDamageNumbers);
+      toggleDamageBtn.textContent = `데미지 표시: ${enabled ? '켜짐' : '꺼짐'}`;
+    }
+    if(toggleDamageBtn){
+      updateDamageToggleText();
+      toggleDamageBtn.addEventListener('click', ()=>{
+        SFX.ui();
+        state.settings.showDamageNumbers = !state.settings.showDamageNumbers;
+        if(!state.settings.showDamageNumbers){
+          gridEl?.querySelectorAll('.dmg').forEach(el=>el.remove());
+        }
+        updateDamageToggleText();
+        save();
+      });
+    }
+
     if(playGamesLoginBtn){
       playGamesLoginBtn.addEventListener('click', ()=>{
         SFX.ui();
@@ -2912,6 +2949,7 @@ section[id^="tab-"].active{ display:block; }
 
     function boot(){
       load();
+      updateDamageToggleText();
       detectPlayGamesBridge();
       updatePlayGamesUI();
       refreshPlayGamesStatus();
