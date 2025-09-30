@@ -2132,7 +2132,7 @@ section[id^="tab-"].active{ display:block; }
       renderSkillBar(); renderGrid(); renderTop();
     }
 
-    function floorHpMul(){ return 1 + 0.35*(state.floor-1); }
+    function floorHpMul(){ return Math.pow(1.25, state.floor-1); }
     function floorValMul(){ return 1 + 0.12*(state.floor-1); }
     function etherHpForFloor(){
       const baseHp = 500;
