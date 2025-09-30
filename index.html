@@ -661,7 +661,7 @@ section[id^="tab-"].active{ display:block; }
       runFlags: { berserkBoostActive:false, berserkBoostPrevExpiry:null, hasteActive:false },
 
       // Settings
-      settings: { autoSell:false, showDamageNumbers:true },
+      settings: { autoSell:false, showDamageNumbers:true, sfxEnabled:true },
 
       lastTickReal: 0,
       visibilityPauseTs: 0,
@@ -689,11 +689,12 @@ section[id^="tab-"].active{ display:block; }
 
     function ensureSettingsDefaults(){
       if(!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)){
-        state.settings = { autoSell:false, showDamageNumbers:true };
+        state.settings = { autoSell:false, showDamageNumbers:true, sfxEnabled:true };
         return;
       }
       if(typeof state.settings.autoSell !== 'boolean') state.settings.autoSell = false;
       if(typeof state.settings.showDamageNumbers !== 'boolean') state.settings.showDamageNumbers = true;
+      if(typeof state.settings.sfxEnabled !== 'boolean') state.settings.sfxEnabled = true;
     }
 
     function resetRunFlags(){
@@ -790,6 +791,7 @@ section[id^="tab-"].active{ display:block; }
         }
         state.settings = s.settings || state.settings;
         ensureSettingsDefaults();
+        sfxEnabled = state.settings.sfxEnabled !== false;
         ensurePassiveDefaults();
         ensureSkillAutoDefaults();
         resetRunFlags();
@@ -2815,12 +2817,21 @@ section[id^="tab-"].active{ display:block; }
       }
     });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
-    $('#toggleSoundBtn').addEventListener('click', ()=>{
-      SFX.ui();
-      sfxEnabled = !sfxEnabled;
-      if(sfxEnabled) ensureAudio();
-      $('#toggleSoundBtn').textContent = `효과음: ${sfxEnabled?'켜짐':'꺼짐'}`;
-    });
+    const toggleSoundBtn = document.getElementById('toggleSoundBtn');
+    function updateSoundToggleText(){
+      if(!toggleSoundBtn) return;
+      toggleSoundBtn.textContent = `효과음: ${sfxEnabled ? '켜짐' : '꺼짐'}`;
+    }
+    if(toggleSoundBtn){
+      toggleSoundBtn.addEventListener('click', ()=>{
+        SFX.ui();
+        sfxEnabled = !sfxEnabled;
+        state.settings.sfxEnabled = sfxEnabled;
+        if(sfxEnabled) ensureAudio();
+        updateSoundToggleText();
+        save();
+      });
+    }
 
     const toggleDamageBtn = document.getElementById('toggleDamageBtn');
     function updateDamageToggleText(){
@@ -2949,6 +2960,7 @@ section[id^="tab-"].active{ display:block; }
 
     function boot(){
       load();
+      updateSoundToggleText();
       updateDamageToggleText();
       detectPlayGamesBridge();
       updatePlayGamesUI();
