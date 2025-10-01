@@ -289,7 +289,7 @@ window.UPGRADE_INFO = [
   },
   {
     key: 'spawn',
-    title: '⚙️ 생성 속도',
+    title: '⚙️ 광물 생성 속도',
     getLevel: (state) => getUpgradeLevel(state, 'spawn'),
     getLevelLabel: (state) => {
       const level = getUpgradeLevel(state, 'spawn');
@@ -308,7 +308,7 @@ window.UPGRADE_INFO = [
         if(typeof ms !== 'number' || !Number.isFinite(ms)) return '--';
         return (ms / 1000).toFixed(2);
       };
-      let desc = `현재 생성 간격: ${formatSeconds(current)}초${suffix}`;
+      let desc = `현재 광물 생성 간격: ${formatSeconds(current)}초${suffix}`;
       if(state && state.inRun){
         const active = (typeof state.currentSpawnIntervalMs === 'number' && Number.isFinite(state.currentSpawnIntervalMs))
           ? state.currentSpawnIntervalMs
@@ -316,7 +316,7 @@ window.UPGRADE_INFO = [
         const diff = Math.abs(active - current);
         const hasteActive = !!(state.runFlags && state.runFlags.hasteActive);
         if(!hasteActive && diff > 1){
-          desc += ` (실제: ${formatSeconds(active)}초)`;
+          desc += ` (실제 광물 생성 간격: ${formatSeconds(active)}초)`;
         }
       }
       return desc;
