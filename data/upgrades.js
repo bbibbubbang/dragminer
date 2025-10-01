@@ -94,6 +94,7 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 520,
     costExponent: 1.17,
+    maxLevel: 60,
   },
 };
 
@@ -144,7 +145,9 @@ const REFINERY_EFFECT = {
 };
 
 function computeRefineryStats(level = 0) {
-  const lvl = Math.max(0, Math.floor(level));
+  const rawLevel = Math.max(0, Math.floor(level));
+  const max = UPGRADE_CONFIG?.refinery?.maxLevel;
+  const lvl = Number.isFinite(max) ? Math.min(rawLevel, max) : rawLevel;
   const perLevel = REFINERY_EFFECT.perLevelBase + (REFINERY_EFFECT.perLevelPerUpgrade * lvl);
   const flatBonus = REFINERY_EFFECT.flatPerUpgrade * lvl;
   return { perLevel, flatBonus };
@@ -467,24 +470,50 @@ window.UPGRADE_INFO = [
     key: 'refinery',
     title: '⚗️ 정제 공정 최적화',
     getLevel: (state) => getUpgradeLevel(state, 'refinery'),
-    getLevelLabel: (state) => `Lv ${getUpgradeLevel(state, 'refinery')}`,
+    getLevelLabel: (state) => {
+      const level = getUpgradeLevel(state, 'refinery');
+      const max = UPGRADE_CONFIG.refinery?.maxLevel || 0;
+      return max ? `Lv ${level}/${max}` : `Lv ${level}`;
+    },
     getDescription: (state) => {
       const level = getUpgradeLevel(state, 'refinery');
+      const max = UPGRADE_CONFIG.refinery?.maxLevel || 0;
+      const hasNext = !max || level < max;
       const current = computeRefineryStats(level);
-      const next = computeRefineryStats(level + 1);
+      const next = computeRefineryStats(hasNext ? level + 1 : level);
       const perLevelPercent = (value) => `${(value * 100).toFixed(2)}%`;
       const flatPercent = (value) => `${(value * 100).toFixed(1)}%`;
       const parts = [
-        `판매 레벨 보너스: +${perLevelPercent(current.perLevel)} → +${perLevelPercent(next.perLevel)} (레벨당)`,
-        `추가 판매 배수: +${flatPercent(current.flatBonus)} → +${flatPercent(next.flatBonus)}`,
+        hasNext
+          ? `판매 레벨 보너스: +${perLevelPercent(current.perLevel)} → +${perLevelPercent(next.perLevel)} (레벨당)`
+          : `판매 레벨 보너스: +${perLevelPercent(current.perLevel)} (최대)`,
+        hasNext
+          ? `추가 판매 배수: +${flatPercent(current.flatBonus)} → +${flatPercent(next.flatBonus)}`
+          : `추가 판매 배수: +${flatPercent(current.flatBonus)} (최대)`,
       ];
+      if (!hasNext) {
+        parts.push('이미 최대 레벨입니다.');
+      }
       return parts.join('<br>');
     },
     getCost: (state) => upgradeCostLinear(state, 'refinery'),
-    canBuy: () => true,
+    canBuy: (state) => {
+      const max = UPGRADE_CONFIG.refinery?.maxLevel || Infinity;
+      const current = getUpgradeLevel(state, 'refinery');
+      if (current >= max) {
+        return '이미 최대 레벨입니다.';
+      }
+      return true;
+    },
     onBuy: ({ state }) => {
-      const next = getUpgradeLevel(state, 'refinery') + 1;
-      setUpgradeLevel(state, 'refinery', next);
+      const current = getUpgradeLevel(state, 'refinery');
+      const max = UPGRADE_CONFIG.refinery?.maxLevel;
+      if (Number.isFinite(max) && current >= max) {
+        return;
+      }
+      const next = current + 1;
+      const clampedNext = Number.isFinite(max) ? Math.min(next, max) : next;
+      setUpgradeLevel(state, 'refinery', clampedNext);
     },
   },
 ];
