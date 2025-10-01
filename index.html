@@ -378,66 +378,167 @@ section[id^="tab-"].active{ display:block; }
       ore.glow = visuals.glow;
       ore.shape = def.shape || null;
     }
-    const SPAWN_COLUMN_MAP = {
-      '석재':'Stone',
-      '구리':'Copper',
-      '철':'Iron',
-      '은':'Silver',
-      '금':'Gold',
-      '백금':'Platinum',
-      '사파이어':'Sapphire',
-      '루비':'Ruby',
-      '에메랄드':'Emerald',
-      '미스릴':'Mythril',
-      '다이아몬드':'Diamond'
+    const ORE_SPAWN_CONFIG = {
+      ores: ORES.map(o=>o.key),
+      baseline: { Stone:60, Copper:30, Iron:10 },
+      introOrder: ['Silver','Gold','Platinum','Sapphire','Ruby','Emerald','Mythril','Diamond']
     };
-    function parseSpawnTable(raw){
-      const table = new Map();
-      if(typeof raw !== 'string') return { table, floors: [], maxFloor: 0 };
-      const lines = raw.split(/\r?\n/).map(line=>line.trim()).filter(line=>line.length>0);
-      if(lines.length<=1) return { table, floors: [], maxFloor: 0 };
-      const headers = lines[0].split(/\s+/);
-      const columns = headers.slice(1).map(label=> SPAWN_COLUMN_MAP[label] || null);
-      for(let i=1;i<lines.length;i++){
-        const parts = lines[i].split(/\s+/).filter(Boolean);
-        if(!parts.length) continue;
-        const floor = parseInt(parts[0], 10);
-        if(!Number.isFinite(floor)) continue;
-        const row = [];
-        for(let j=1;j<=columns.length;j++){
-          const key = columns[j-1];
-          if(!key) continue;
-          const token = parts[j] ?? '0';
-          const value = parseFloat(token.replace(/,/g,''));
-          if(!Number.isFinite(value) || value<=0) continue;
-          row.push({ key, chance: value });
-        }
-        if(row.length) table.set(floor, row);
-      }
-      const floors = Array.from(table.keys()).sort((a,b)=>a-b);
-      const maxFloor = floors.length? floors[floors.length-1] : 0;
-      return { table, floors, maxFloor };
-    }
-    let SPAWN_TABLE = new Map();
-    let SPAWN_FLOORS = [];
-    let SPAWN_MAX_FLOOR = 0;
 
-    async function loadSpawnTable(){
-      try{
-        const resp = await fetch('data/spawnore');
-        if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const text = await resp.text();
-        const info = parseSpawnTable(text || '');
-        SPAWN_TABLE = info.table || new Map();
-        SPAWN_FLOORS = info.floors || [];
-        SPAWN_MAX_FLOOR = info.maxFloor || 0;
-      }catch(err){
-        console.warn('Failed to load spawn table, using defaults', err);
-        const fallback = parseSpawnTable('');
-        SPAWN_TABLE = fallback.table;
-        SPAWN_FLOORS = fallback.floors;
-        SPAWN_MAX_FLOOR = fallback.maxFloor;
+    function buildIntroMap(cfg){
+      const intro = {};
+      ['Stone','Copper','Iron'].forEach(name=>{ if(cfg.ores.includes(name)) intro[name] = 1; });
+      let step = 1;
+      for(const name of cfg.introOrder){
+        if(!cfg.ores.includes(name)) continue;
+        if(typeof intro[name] === 'number') continue;
+        intro[name] = step * 10;
+        step++;
       }
+      for(const name of cfg.ores){
+        if(typeof intro[name] !== 'number') intro[name] = step * 10;
+      }
+      return intro;
+    }
+
+    function orderedByTier(cfg, intro){
+      const order = [...cfg.ores];
+      return order.sort((a,b)=>{
+        const diff = (intro[a] || 0) - (intro[b] || 0);
+        if(diff !== 0) return diff;
+        return cfg.ores.indexOf(a) - cfg.ores.indexOf(b);
+      });
+    }
+
+    function cloneInitProb(cfg){
+      const result = Object.fromEntries(cfg.ores.map(name=>[name, 0]));
+      for(const [name, value] of Object.entries(cfg.baseline || {})){
+        if(result.hasOwnProperty(name)) result[name] = value;
+      }
+      const sum = Object.values(result).reduce((acc,val)=>acc+val,0);
+      if(Math.abs(sum - 100) > 1e-9){
+        for(const key of Object.keys(result)){
+          result[key] = result[key] * 100 / (sum || 1);
+        }
+      }
+      return result;
+    }
+
+    function availableBefore(intro, order, floor){
+      return order.filter(name => (intro[name] || 0) < floor);
+    }
+
+    function availableIncl(intro, order, floor){
+      return order.filter(name => (intro[name] || 0) <= floor);
+    }
+
+    function round2(val){
+      return Math.round(val * 100) / 100;
+    }
+
+    function cascadeDeduct(prob, amount, donorsLowToHigh, everZero){
+      let remaining = amount;
+      const deducted = new Set();
+      for(const name of donorsLowToHigh){
+        if(remaining <= 0) break;
+        const take = Math.min(prob[name] || 0, remaining);
+        if(take <= 0) continue;
+        prob[name] = round2((prob[name] || 0) - take);
+        remaining = round2(remaining - take);
+        deducted.add(name);
+        if(prob[name] <= 1e-9){
+          prob[name] = 0;
+          everZero.add(name);
+        }
+      }
+      return { got: round2(amount - remaining), deducted };
+    }
+
+    function weightedRedistribute(prob, total, recipsLowToHigh){
+      if(total <= 0 || !recipsLowToHigh.length) return { recipients:new Set(), total:0 };
+      const K = recipsLowToHigh.length;
+      const wsum = K * (K + 1) / 2;
+      const shares = recipsLowToHigh.map((_, idx)=> total * (K - idx) / wsum);
+      const rounded = shares.map(share => round2(share));
+      const roundedSum = rounded.reduce((acc,val)=>acc + val, 0);
+      const delta = round2(total - roundedSum);
+      if(rounded.length){
+        rounded[0] = round2(rounded[0] + delta);
+      }
+      const recipients = new Set();
+      recipsLowToHigh.forEach((name, idx)=>{
+        const gain = rounded[idx] || 0;
+        if(gain <= 0) return;
+        prob[name] = round2((prob[name] || 0) + gain);
+        recipients.add(name);
+      });
+      return { recipients, total: rounded.reduce((acc,val)=>acc+val,0) };
+    }
+
+    function getProbabilitiesAtFloor(cfg, floor, luckLevel){
+      const intro = buildIntroMap(cfg);
+      const order = orderedByTier(cfg, intro);
+      const prob = cloneInitProb(cfg);
+      const everZero = new Set();
+      const DIAMOND = cfg.ores.find(name => /diamond/i.test(name)) || order[order.length - 1];
+      const perFloorBase = 1.0;
+      const luck = Number.isFinite(luckLevel) ? Math.max(0, Math.floor(luckLevel)) : 0;
+      const perFloor = perFloorBase + 0.10 * luck;
+      const maxFloor = Math.max(1, Math.floor(floor));
+      for(let f=1; f<=maxFloor; f++){
+        const recipientsThisFloor = new Set();
+        const newOres = order.filter(name => (intro[name] || 0) === f);
+        if(f > 1 && newOres.length){
+          const donors = availableBefore(intro, order, f).filter(name => !everZero.has(name) && (prob[name] || 0) > 0);
+          for(const name of newOres){
+            const { got } = cascadeDeduct(prob, 10.0, donors, everZero);
+            if(got > 0){
+              prob[name] = round2((prob[name] || 0) + got);
+              recipientsThisFloor.add(name);
+            }
+          }
+        }
+        if(f > 1){
+          const donors = availableBefore(intro, order, f).filter(name => !everZero.has(name) && (prob[name] || 0) > 0);
+          const donorSum = donors.reduce((acc,name)=> acc + (prob[name] || 0), 0);
+          if(donors.length >= 2 && donorSum >= perFloor){
+            const { got, deducted } = cascadeDeduct(prob, perFloor, donors, everZero);
+            if(got > 0){
+              const recips = availableBefore(intro, order, f)
+                .filter(name => !everZero.has(name) && !deducted.has(name));
+              const { recipients } = weightedRedistribute(prob, got, recips);
+              recipients.forEach(name => recipientsThisFloor.add(name));
+            }
+          }
+        }
+        let sum = 0;
+        for(const name of cfg.ores){
+          prob[name] = round2(prob[name] || 0);
+          sum += prob[name];
+        }
+        const delta = round2(100 - sum);
+        if(Math.abs(delta) > 1e-9){
+          const candidates = order.filter(name => recipientsThisFloor.has(name));
+          const eligible = candidates.length ? candidates : availableIncl(intro, order, f).filter(name => !everZero.has(name));
+          const target = eligible.length ? eligible[0] : DIAMOND;
+          prob[target] = round2((prob[target] || 0) + delta);
+          if(prob[target] <= 1e-9){
+            prob[target] = 0;
+            everZero.add(target);
+          }
+        }
+        if((prob[DIAMOND] || 0) >= 100) break;
+      }
+      return prob;
+    }
+
+    const ORE_PROB_CACHE = new Map();
+    function getCachedProbabilities(floor, luckLevel){
+      const key = `${Math.max(1, Math.floor(floor || 1))}|${Math.max(0, Math.floor(luckLevel || 0))}`;
+      if(!ORE_PROB_CACHE.has(key)){
+        ORE_PROB_CACHE.set(key, getProbabilitiesAtFloor(ORE_SPAWN_CONFIG, Math.max(1, Math.floor(floor || 1)), Math.max(0, Math.floor(luckLevel || 0))));
+      }
+      const stored = ORE_PROB_CACHE.get(key) || {};
+      return { ...stored };
     }
     const ACTIVE_SKILLS = window.ACTIVE_SKILL_DATA;
     const BERSERK_SKILL = ACTIVE_SKILLS.find(s=>s.key==='berserk');
@@ -1299,37 +1400,16 @@ section[id^="tab-"].active{ display:block; }
 
     function randWeighted(items){ const total = items.reduce((a,b)=>a+b.weight,0); let r = Math.random()*total; for(const it of items){ if((r-=it.weight) <= 0) return it; } return items[0]; }
     function defaultOrePool(){ return ORES.map(o=>({ ...o, weight: 1 })); }
-    function spawnRowForFloor(f){
-      if(!SPAWN_FLOORS.length) return null;
-      const floor = Math.max(1, Math.floor(f));
-      if(SPAWN_TABLE.has(floor)) return SPAWN_TABLE.get(floor);
-      if(floor > SPAWN_MAX_FLOOR) return SPAWN_TABLE.get(SPAWN_MAX_FLOOR) || null;
-      for(let i=SPAWN_FLOORS.length-1;i>=0;i--){
-        const candidate = SPAWN_FLOORS[i];
-        if(candidate <= floor) return SPAWN_TABLE.get(candidate);
-      }
-      return SPAWN_TABLE.get(SPAWN_FLOORS[0]) || null;
-    }
     function eligibleOresForFloor(f){
-      const row = spawnRowForFloor(f);
-      if(!row || !row.length) return defaultOrePool();
-      const pool = [];
+      const floor = Math.max(1, Math.floor(f));
       const luckLevel = state.aether?.luck || 0;
-      const hasLuck = luckLevel > 0;
-      for(const entry of row){
-        const info = ORE_BY_KEY.get(entry.key);
-        if(!info) continue;
-        const weight = Math.max(0, entry.chance);
-        if(!(weight>0)) continue;
-        let scaled = Math.max(1, Math.round(weight*100));
-        if(hasLuck){
-          const tierBonus = Math.max(0, (info.tier||1) - 1);
-          if(tierBonus>0){
-            const mul = 1 + luckLevel * 0.08 * tierBonus;
-            scaled = Math.max(1, Math.round(scaled * mul));
-          }
-        }
-        pool.push({ ...info, weight: scaled });
+      const distribution = getCachedProbabilities(floor, luckLevel);
+      const pool = [];
+      for(const ore of ORES){
+        const chance = Math.max(0, distribution[ore.key] || 0);
+        if(!(chance > 0)) continue;
+        const weight = Math.max(1, Math.round(chance * 100));
+        pool.push({ ...ore, weight });
       }
       return pool.length ? pool : defaultOrePool();
     }
@@ -3055,8 +3135,7 @@ section[id^="tab-"].active{ display:block; }
       maybeStartAutoChallenge();
     }
 
-    async function init(){
-      await loadSpawnTable();
+    function init(){
       boot();
       activateTab(document.querySelector('.tab-btn.active')?.dataset.tab || 'dungeon');
     }
