@@ -436,7 +436,7 @@ window.UPGRADE_INFO = [
   },
   {
     key: 'petAi',
-    title: '🧠 펫 행동 알고리즘',
+    title: '🧠 똑똑한 펫',
     getLevel: (state) => getUpgradeLevel(state, 'petAi'),
     getLevelLabel: (state) => `Lv ${getUpgradeLevel(state, 'petAi')}`,
     getDescription: (state) => {

@@ -2614,6 +2614,9 @@ section[id^="tab-"].active{ display:block; }
         state.pets.push(initPetMotion(createPet({ ...styleDef, damageMul: 2, special: true, styleIndex: i })));
       }
       renderPets();
+      if(typeof applyPetBehaviorUpgrade === 'function'){
+        applyPetBehaviorUpgrade();
+      }
     }
     function renderPets(){
       gridEl.querySelectorAll('.pet').forEach(p=>p.remove());
