@@ -6,7 +6,7 @@
   <title>드래그 광산</title>
   <style>
     :root{ --bg:#0f1220;--panel:#161a2e;--accent:#6ee7ff;--accent2:#a78bfa;--text:#eaf2ff;--muted:#9aa3b2;--danger:#ff6b6b;--ok:#22c55e; --bar:#1b2342; }
-    *{box-sizing:border-box}
+    *{box-sizing:border-box;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}
     html,body{height:100%;margin:0; overscroll-behavior-y: none; overscroll-behavior-x: none;}
     body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Apple SD Gothic Neo, "Malgun Gothic", sans-serif; background:linear-gradient(180deg, #0b0e1a 0%, #0f1220 100%); color:var(--text);}
     body.lock-v{ overflow:hidden; }
@@ -275,6 +275,23 @@ section[id^="tab-"].active{ display:block; }
   <script src="data/upgrades.js"></script>
   <script src="data/skills.js"></script>
   <script src="data/aether.js"></script>
+  <script>
+    (function(){
+      function blockEvent(e){
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+      }
+      var copyEvents = ['copy', 'cut'];
+      for (var i = 0; i < copyEvents.length; i++){
+        document.addEventListener(copyEvents[i], blockEvent);
+      }
+      document.addEventListener('dragstart', blockEvent);
+      document.addEventListener('selectstart', function(e){
+        var target = e ? e.target : null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+        blockEvent(e);
+      });
+    })();
+  </script>
   <script>
   (()=>{
 
