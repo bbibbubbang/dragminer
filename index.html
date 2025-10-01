@@ -472,6 +472,45 @@ section[id^="tab-"].active{ display:block; }
     const getUpgradeLevel = window.getUpgradeLevel;
     const computePetBehaviorStats = window.computePetBehaviorStats;
     const computeRefineryMultiplier = window.computeRefineryMultiplier;
+    const ETHER_SPAWN_SETTINGS = window.ETHER_SPAWN_SETTINGS || {
+      baseDelay: 15,
+      reductionPerLevel: 0.5,
+      maxLevel: 10,
+    };
+    const computeEtherSpawnReduction = typeof window.computeEtherSpawnReduction === 'function'
+      ? window.computeEtherSpawnReduction
+      : (level = 0) => {
+          const rawLevel = Math.max(0, Math.floor(level || 0));
+          const cap = Number.isFinite(ETHER_SPAWN_SETTINGS.maxLevel)
+            ? ETHER_SPAWN_SETTINGS.maxLevel
+            : rawLevel;
+          const per = Number.isFinite(ETHER_SPAWN_SETTINGS.reductionPerLevel)
+            ? ETHER_SPAWN_SETTINGS.reductionPerLevel
+            : 0.5;
+          const clamped = Number.isFinite(cap) ? Math.min(rawLevel, cap) : rawLevel;
+          return clamped * per;
+        };
+    const ETHER_SPAWN_BASE_DELAY = Number.isFinite(ETHER_SPAWN_SETTINGS.baseDelay)
+      ? ETHER_SPAWN_SETTINGS.baseDelay
+      : 15;
+
+    function getEtherLocatorLevel(state){
+      if(typeof getUpgradeLevel === 'function'){
+        return getUpgradeLevel(state, 'etherLocator');
+      }
+      const entry = state?.upgrades?.etherLocator;
+      if(entry && typeof entry.level === 'number' && Number.isFinite(entry.level)){
+        return Math.max(0, Math.floor(entry.level));
+      }
+      return 0;
+    }
+
+    function computeEtherSpawnDelay(perkLevel = 0, upgradeLevel = 0){
+      const perkReduction = computeEtherSpawnReduction(perkLevel);
+      const upgradeReduction = computeEtherSpawnReduction(upgradeLevel);
+      const totalReduction = Math.min(ETHER_SPAWN_BASE_DELAY, perkReduction + upgradeReduction);
+      return Math.max(0, ETHER_SPAWN_BASE_DELAY - totalReduction);
+    }
     const VERSION = 'miner_v2.6.1';
     // 고정 세이브키 + 구버전 마이그레이션
     const SAVE_KEY = 'miner_save_v1';
@@ -1655,7 +1694,7 @@ section[id^="tab-"].active{ display:block; }
           const price = typeof info.getCost === 'function' ? info.getCost(state) : cost;
           if(!spend(price)){ SFX.deny(); return; }
           if(typeof info.onBuy === 'function'){
-            info.onBuy({ state, restartSpawnTimer, spawnPets, applyPetBehaviorUpgrade });
+            info.onBuy({ state, restartSpawnTimer, spawnPets, applyPetBehaviorUpgrade, renderAether });
           }
           SFX.ui();
           save();
@@ -1706,9 +1745,26 @@ section[id^="tab-"].active{ display:block; }
         const desc = `<div class="mono" style="opacity:.8;margin:4px 0 6px 0">${p.desc}</div>`;
         let extra = '';
         if(p.key === 'etherHaste'){
-          const delay = Math.max(0, 15 - (lvl * 0.5));
-          const formatted = Number.isInteger(delay) ? delay.toFixed(0) : delay.toFixed(1);
-          extra = `<div class="mono" style="margin:0 0 6px 0">현재 등장: ${formatted}초</div>`;
+          const upgradeLevel = getEtherLocatorLevel(state);
+          const currentDelay = computeEtherSpawnDelay(lvl, upgradeLevel);
+          const perkReduction = computeEtherSpawnReduction(lvl);
+          const upgradeReduction = computeEtherSpawnReduction(upgradeLevel);
+          const formatSeconds = (value) => {
+            if(!Number.isFinite(value)) return '--';
+            const normalized = Math.max(0, value);
+            if(normalized === 0) return '0.0';
+            const decimals = Number.isInteger(normalized) ? 0 : 1;
+            return normalized.toFixed(decimals);
+          };
+          const lines = [`현재 등장: ${formatSeconds(currentDelay)}초`];
+          if(perkReduction > 0){
+            lines.push(`<span style="opacity:.75">환생 보너스: -${formatSeconds(perkReduction)}초</span>`);
+          }
+          if(upgradeReduction > 0){
+            lines.push(`<span style="opacity:.75">골드 업그레이드: -${formatSeconds(upgradeReduction)}초</span>`);
+          }
+          const content = lines.join('<br>');
+          extra = `<div class="mono" style="margin:0 0 6px 0">${content}</div>`;
         }
         row.innerHTML = header + desc + extra +
                          `<div class="row" style="justify-content:space-between;margin-top:6px">
@@ -2211,7 +2267,8 @@ section[id^="tab-"].active{ display:block; }
         state.lastTickReal = now;
         const elapsed = (now - state.runStartTs)/1000;
         const etherHasteLevel = state.aether?.etherHaste || 0;
-        const etherDelay = 15 - (etherHasteLevel * 0.5);
+        const etherUpgradeLevel = getEtherLocatorLevel(state);
+        const etherDelay = computeEtherSpawnDelay(etherHasteLevel, etherUpgradeLevel);
         if(!state.etherSpawned && elapsed >= etherDelay){ spawnEther(); }
         if(delta > 0){ reduceRunTime(delta); }
         const cdKeys = Object.keys(state.skillCooldowns);
