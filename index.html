@@ -35,6 +35,16 @@
     #tab-dungeon{flex:1;display:flex;flex-direction:column;overflow:hidden}
     .grid-wrap{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
     .grid{position:relative;background:#0e1328;padding:6px;border-radius:16px;border:1px solid #202a51;touch-action: none;flex:1}
+    .fx-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:40;}
+    .fx-anchor{position:absolute;left:0;top:0;transform:translate(-50%,-50%);pointer-events:none;will-change:transform;}
+    .fx-meteor{position:absolute;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff 0%,#fed7aa 38%,#fb923c 68%,rgba(251,146,60,0) 100%);box-shadow:0 0 18px rgba(251,146,60,0.75);filter:saturate(1.05);}
+    .fx-meteor::after{content:'';position:absolute;left:50%;top:50%;width:12px;height:62px;transform:translate(-50%,-18%) rotate(32deg);transform-origin:50% 10%;background:linear-gradient(180deg,rgba(251,146,60,0.85) 0%,rgba(251,146,60,0));border-radius:999px;opacity:.85;filter:blur(.4px);}
+    .fx-meteor-burst{position:absolute;width:82px;height:82px;border-radius:50%;background:radial-gradient(circle,rgba(255,248,196,0.95) 0%,rgba(253,186,116,0.7) 42%,rgba(248,113,22,0.1) 68%,rgba(248,113,22,0) 100%);transform:translate(-50%,-50%) scale(0.35);opacity:0;mix-blend-mode:screen;}
+    .fx-meteor-ring{position:absolute;width:70px;height:70px;border-radius:50%;border:2px solid rgba(253,186,116,0.65);transform:translate(-50%,-50%) scale(0.5);opacity:0;filter:drop-shadow(0 0 8px rgba(253,186,116,0.55));}
+    .fx-sonic{pointer-events:none;}
+    .fx-sonic-core{position:absolute;width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#dbeafe 0%,#93c5fd 40%,#38bdf8 68%,rgba(56,189,248,0) 100%);transform:translate(-50%,-50%) scale(0.6);opacity:0;box-shadow:0 0 18px rgba(125,211,252,0.85);}
+    .fx-sonic-ring{position:absolute;left:50%;top:50%;width:128px;height:128px;border-radius:50%;border:2px solid rgba(125,211,252,0.75);transform:translate(-50%,-50%) scale(0.4);opacity:0;filter:drop-shadow(0 0 8px rgba(59,130,246,0.45));}
+    .fx-sonic-line{position:absolute;left:50%;top:50%;width:124px;height:4px;margin-top:-2px;background:linear-gradient(90deg,rgba(125,211,252,0),rgba(125,211,252,0.9) 46%,rgba(125,211,252,0));transform-origin:0% 50%;opacity:0;filter:drop-shadow(0 0 6px rgba(125,211,252,0.6));}
     .ore{position:absolute;width:52px;height:52px;display:flex;align-items:center;justify-content:center;}
     .ore .name{display:none}
     .ore .hp{z-index:3}
@@ -1079,6 +1089,7 @@ section[id^="tab-"].active{ display:block; }
     let gridRectCache = null;
     let lastGridRectValid = null;
     let gridSafeMargin = { x: 6, y: 6 };
+    let fxLayerEl = null;
 
     const ORE_SIZE = 52;
     const ORE_RADIUS = ORE_SIZE / 2;
@@ -1654,6 +1665,153 @@ section[id^="tab-"].active{ display:block; }
       document.body.classList.toggle('lock-v', isDungeonVisible);
     }
 
+    function ensureFxLayer(){
+      if(!gridEl) return null;
+      if(!fxLayerEl){
+        fxLayerEl = document.createElement('div');
+        fxLayerEl.id = 'fxLayer';
+        fxLayerEl.className = 'fx-layer';
+      }
+      if(gridEl && fxLayerEl.parentElement !== gridEl){
+        gridEl.appendChild(fxLayerEl);
+      }
+      return fxLayerEl;
+    }
+
+    function fxBounds(){
+      const rect = gridRect();
+      const width = Math.max(0, (rect.innerWidth ?? rect.width) || 0);
+      const height = Math.max(0, (rect.innerHeight ?? rect.height) || 0);
+      return { width, height };
+    }
+
+    function clampFxPoint(point, bounds){
+      const fallbackX = bounds.width / 2;
+      const fallbackY = bounds.height / 2;
+      const margin = 18;
+      const maxX = Math.max(margin, bounds.width - margin);
+      const maxY = Math.max(margin, bounds.height - margin);
+      const x = clamp(Number.isFinite(point?.x) ? point.x : fallbackX, margin, maxX);
+      const y = clamp(Number.isFinite(point?.y) ? point.y : fallbackY, margin, maxY);
+      return { x, y };
+    }
+
+    function sampleTargets(points, count){
+      const pool = Array.isArray(points) ? points.slice() : [];
+      if(pool.length <= count) return pool.map(p => ({ x: p.x, y: p.y }));
+      const picked = [];
+      while(picked.length < count && pool.length){
+        const idx = Math.floor(Math.random() * pool.length);
+        const chosen = pool.splice(idx, 1)[0];
+        picked.push({ x: chosen.x, y: chosen.y });
+      }
+      return picked;
+    }
+
+    function spawnMeteorFx(rawTargets){
+      const layer = ensureFxLayer();
+      if(!layer) return;
+      const bounds = fxBounds();
+      const targets = Array.isArray(rawTargets) && rawTargets.length
+        ? rawTargets.map(p => ({ x: p.x, y: p.y }))
+        : [{ x: bounds.width / 2, y: bounds.height / 2 }];
+      const meteorCount = Math.max(1, Math.min(6, targets.length));
+      const shots = targets.length > meteorCount ? sampleTargets(targets, meteorCount) : targets;
+      shots.forEach((pt, index) => {
+        const { x, y } = clampFxPoint(pt, bounds);
+        const anchor = document.createElement('div');
+        anchor.className = 'fx-anchor fx-meteor-strike';
+        anchor.style.left = `${x}px`;
+        anchor.style.top = `${y}px`;
+
+        const meteor = document.createElement('div');
+        meteor.className = 'fx-meteor';
+        const burst = document.createElement('div');
+        burst.className = 'fx-meteor-burst';
+        const ring = document.createElement('div');
+        ring.className = 'fx-meteor-ring';
+
+        anchor.appendChild(burst);
+        anchor.appendChild(ring);
+        anchor.appendChild(meteor);
+        layer.appendChild(anchor);
+
+        const delay = index * 70;
+        const startX = -130 - Math.random() * 80;
+        const startY = -220 - Math.random() * 90;
+        const impactOffset = -8;
+
+        meteor.animate([
+          { transform: `translate(${startX}px, ${startY}px) scale(0.55) rotate(32deg)`, opacity: 0 },
+          { offset: 0.22, opacity: 1 },
+          { transform: `translate(${impactOffset}px, ${impactOffset}px) scale(1.08) rotate(32deg)`, opacity: 0 }
+        ], { duration: 720, delay, easing: 'cubic-bezier(0.25,0.8,0.3,1)', fill: 'forwards' });
+
+        burst.animate([
+          { transform: 'translate(-50%, -50%) scale(0.35)', opacity: 0 },
+          { transform: 'translate(-50%, -50%) scale(1)', opacity: 0.95, offset: 0.5 },
+          { transform: 'translate(-50%, -50%) scale(1.45)', opacity: 0 }
+        ], { duration: 560, delay: delay + 340, easing: 'cubic-bezier(0.28,0.7,0.25,1)', fill: 'forwards' });
+
+        ring.animate([
+          { transform: 'translate(-50%, -50%) scale(0.55)', opacity: 0.75 },
+          { transform: 'translate(-50%, -50%) scale(1.4)', opacity: 0 }
+        ], { duration: 520, delay: delay + 360, easing: 'cubic-bezier(0.2,0.7,0.2,1)', fill: 'forwards' });
+
+        setTimeout(() => {
+          anchor.remove();
+        }, delay + 900);
+      });
+    }
+
+    function spawnSonicFx(rawTarget){
+      const layer = ensureFxLayer();
+      if(!layer) return;
+      const bounds = fxBounds();
+      const point = clampFxPoint(rawTarget || null, bounds);
+      const anchor = document.createElement('div');
+      anchor.className = 'fx-anchor fx-sonic';
+      anchor.style.left = `${point.x}px`;
+      anchor.style.top = `${point.y}px`;
+      layer.appendChild(anchor);
+
+      const core = document.createElement('div');
+      core.className = 'fx-sonic-core';
+      anchor.appendChild(core);
+      core.animate([
+        { transform: 'translate(-50%, -50%) scale(0.45)', opacity: 0.95 },
+        { transform: 'translate(-50%, -50%) scale(1.1)', opacity: 0.2 },
+        { transform: 'translate(-50%, -50%) scale(0.25)', opacity: 0 }
+      ], { duration: 420, easing: 'cubic-bezier(0.2,0.8,0.3,1)', fill: 'forwards' });
+
+      const ringCount = 3;
+      for(let i=0;i<ringCount;i++){
+        const ring = document.createElement('div');
+        ring.className = 'fx-sonic-ring';
+        anchor.appendChild(ring);
+        const delay = i * 90;
+        ring.animate([
+          { transform: 'translate(-50%, -50%) scale(0.45)', opacity: 0.85 },
+          { transform: 'translate(-50%, -50%) scale(1.65)', opacity: 0 }
+        ], { duration: 560 + i * 80, delay, easing: 'cubic-bezier(0.2,0.6,0.2,1)', fill: 'forwards' });
+      }
+
+      const lineAngles = [0, 45, 90, 135];
+      for(const angle of lineAngles){
+        const line = document.createElement('div');
+        line.className = 'fx-sonic-line';
+        anchor.appendChild(line);
+        line.animate([
+          { transform: `translate(-50%, -50%) rotate(${angle}deg) scaleX(0.2)`, opacity: 0.8 },
+          { transform: `translate(-50%, -50%) rotate(${angle}deg) scaleX(1.05)`, opacity: 0 }
+        ], { duration: 420, delay: 70, easing: 'cubic-bezier(0.2,0.7,0.2,1)', fill: 'forwards' });
+      }
+
+      setTimeout(() => {
+        anchor.remove();
+      }, 900);
+    }
+
     function renderGrid(){ gridEl.innerHTML='';
       const gr = gridRect();
       const margins = currentGridMargins();
@@ -1715,7 +1873,11 @@ section[id^="tab-"].active{ display:block; }
         gridEl.appendChild(el);
         ore.el = el;
       }
-      renderPets(); }
+      renderPets();
+      if(fxLayerEl){
+        gridEl.appendChild(fxLayerEl);
+      }
+    }
 
     function renderInventory(){ const box=$('#inventoryList'); box.innerHTML='';
       const chk = document.getElementById('autoSellChkInv'); if(chk){ chk.checked = !!state.settings.autoSell; chk.onchange = ()=>{ state.settings.autoSell = !!chk.checked; save(); toast(`자동판매 ${chk.checked?'ON':'OFF'}`); }; }
@@ -2298,6 +2460,7 @@ section[id^="tab-"].active{ display:block; }
       const cd = state.skillCooldowns[key]||0; if(cd>0){ SFX.deny(); return; }
       let cdOverride = null;
       let used = true;
+      let fxAction = null;
       switch(key){
         case 'berserk': {
           const result = activateBerserk();
@@ -2307,9 +2470,20 @@ section[id^="tab-"].active{ display:block; }
           break;
         }
         case 'timewarp': addRunTime(3); SFX.skill(); break;
-        case 'meteor':
-          for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const dmg = Math.max(10, Math.floor(o.maxHp*0.35)); o.hp -= dmg; if(o.hp<=0){ onOreBroken(i, o); } }
-          SFX.skill(); break;
+        case 'meteor': {
+          const impactPoints = [];
+          for(let i=0;i<25;i++){
+            const o = state.grid[i];
+            if(!o) continue;
+            impactPoints.push({ x: o.x, y: o.y });
+            const dmg = Math.max(10, Math.floor(o.maxHp*0.35));
+            o.hp -= dmg;
+            if(o.hp<=0){ onOreBroken(i, o); }
+          }
+          fxAction = () => spawnMeteorFx(impactPoints);
+          SFX.skill();
+          break;
+        }
         case 'haste': {
           state.skillHasteUntil = performance.now()+5000;
           state.runFlags = state.runFlags || {};
@@ -2318,25 +2492,35 @@ section[id^="tab-"].active{ display:block; }
           SFX.skill();
           break;
         }
-        case 'sonic':
+        case 'sonic': {
           const gr = gridRect();
           const cx = Math.max(0, (gr.innerWidth ?? gr.width) || 0) / 2;
           const cy = Math.max(0, (gr.innerHeight ?? gr.height) || 0) / 2;
           const idx = findNearestOreIdx(cx,cy);
+          let sonicPoint = null;
           if(idx>=0){
             const o=state.grid[idx];
-            const atk = calcAtk();
-            const dmg = Math.max(20, Math.round(atk*10));
-            o.hp-=dmg;
-            if(o.hp<=0){ onOreBroken(idx, o); }
+            if(o){
+              sonicPoint = { x: o.x, y: o.y };
+              const atk = calcAtk();
+              const dmg = Math.max(20, Math.round(atk*10));
+              o.hp-=dmg;
+              if(o.hp<=0){ onOreBroken(idx, o); }
+            }
           }
-          SFX.skill(); break;
+          fxAction = () => spawnSonicFx(sonicPoint);
+          SFX.skill();
+          break;
+        }
         default: used = false;
       }
       if(!used) return;
       const nextCd = (cdOverride !== null) ? cdOverride : sk.cd;
       if(typeof nextCd === 'number'){ setCd(key, nextCd); }
       renderSkillBar(); renderGrid(); renderTop();
+      if(typeof fxAction === 'function'){
+        fxAction();
+      }
     }
 
     function floorHpMul(){ return Math.pow(1.1, state.floor-1); }
