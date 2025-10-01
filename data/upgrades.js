@@ -118,8 +118,66 @@ const PET_BEHAVIOR_LIMITS = {
   maxSwingRadius: 42,
 };
 
-function computePetBehaviorStats(level = 0) {
+function resolvePetBehaviorMaxLevel() {
+  const caps = [];
+  const moveGrowth = Number.isFinite(PET_BEHAVIOR_GROWTH.moveSpeedPerLevel)
+    ? PET_BEHAVIOR_GROWTH.moveSpeedPerLevel
+    : 0;
+  if (moveGrowth > 0 && Number.isFinite(PET_BEHAVIOR_LIMITS.maxMoveSpeed)) {
+    const baseMove = Number.isFinite(PET_BEHAVIOR_BASE.moveSpeed) ? PET_BEHAVIOR_BASE.moveSpeed : 0;
+    const diff = PET_BEHAVIOR_LIMITS.maxMoveSpeed - baseMove;
+    if (diff > 0) {
+      caps.push(Math.ceil(diff / moveGrowth));
+    } else {
+      caps.push(0);
+    }
+  }
+
+  const atkGrowth = Number.isFinite(PET_BEHAVIOR_GROWTH.atkIntervalPerLevel)
+    ? PET_BEHAVIOR_GROWTH.atkIntervalPerLevel
+    : 0;
+  if (atkGrowth > 0 && Number.isFinite(PET_BEHAVIOR_LIMITS.minAtkInterval)) {
+    const baseInterval = Number.isFinite(PET_BEHAVIOR_BASE.atkInterval) ? PET_BEHAVIOR_BASE.atkInterval : 0;
+    const diff = baseInterval - PET_BEHAVIOR_LIMITS.minAtkInterval;
+    if (diff > 0) {
+      caps.push(Math.ceil(diff / atkGrowth));
+    } else {
+      caps.push(0);
+    }
+  }
+
+  const radiusGrowth = Number.isFinite(PET_BEHAVIOR_GROWTH.swingRadiusPerLevel)
+    ? PET_BEHAVIOR_GROWTH.swingRadiusPerLevel
+    : 0;
+  if (radiusGrowth > 0 && Number.isFinite(PET_BEHAVIOR_LIMITS.maxSwingRadius)) {
+    const baseRadius = Number.isFinite(PET_BEHAVIOR_BASE.swingRadius) ? PET_BEHAVIOR_BASE.swingRadius : 0;
+    const diff = PET_BEHAVIOR_LIMITS.maxSwingRadius - baseRadius;
+    if (diff > 0) {
+      caps.push(Math.ceil(diff / radiusGrowth));
+    } else {
+      caps.push(0);
+    }
+  }
+
+  if (!caps.length) {
+    return Infinity;
+  }
+
+  return Math.max(...caps);
+}
+
+const PET_BEHAVIOR_MAX_LEVEL = resolvePetBehaviorMaxLevel();
+
+function clampPetBehaviorLevel(level = 0) {
   const lvl = Math.max(0, Math.floor(level));
+  if (Number.isFinite(PET_BEHAVIOR_MAX_LEVEL)) {
+    return Math.min(lvl, PET_BEHAVIOR_MAX_LEVEL);
+  }
+  return lvl;
+}
+
+function computePetBehaviorStats(level = 0) {
+  const lvl = clampPetBehaviorLevel(level);
   const moveSpeed = Math.min(
     PET_BEHAVIOR_LIMITS.maxMoveSpeed,
     PET_BEHAVIOR_BASE.moveSpeed + PET_BEHAVIOR_GROWTH.moveSpeedPerLevel * lvl,
@@ -136,7 +194,13 @@ function computePetBehaviorStats(level = 0) {
 }
 
 window.PET_BEHAVIOR_BASE = PET_BEHAVIOR_BASE;
+window.PET_BEHAVIOR_MAX_LEVEL = PET_BEHAVIOR_MAX_LEVEL;
 window.computePetBehaviorStats = computePetBehaviorStats;
+window.clampPetBehaviorLevel = clampPetBehaviorLevel;
+
+if (UPGRADE_CONFIG?.petAi) {
+  UPGRADE_CONFIG.petAi.maxLevel = PET_BEHAVIOR_MAX_LEVEL;
+}
 
 const REFINERY_EFFECT = {
   perLevelBase: 0.01,
@@ -175,18 +239,29 @@ function normalizeLevel(value, fallback = 0) {
   return Math.max(0, Math.floor(fallback));
 }
 
+function clampUpgradeLevelToConfig(key, level) {
+  const cfg = UPGRADE_CONFIG?.[key];
+  if (!cfg) return level;
+  const max = cfg.maxLevel;
+  if (Number.isFinite(max)) {
+    return Math.min(level, max);
+  }
+  return level;
+}
+
 function getUpgradeLevel(state, key) {
   const cfg = UPGRADE_CONFIG?.[key] || {};
   const defaultLevel = cfg.defaultLevel || 0;
   if (!state || !state.upgrades) {
-    return normalizeLevel(undefined, defaultLevel);
+    return clampUpgradeLevelToConfig(key, normalizeLevel(undefined, defaultLevel));
   }
-  return normalizeLevel(state.upgrades[key], defaultLevel);
+  const normalized = normalizeLevel(state.upgrades[key], defaultLevel);
+  return clampUpgradeLevelToConfig(key, normalized);
 }
 
 function setUpgradeLevel(state, key, level) {
   if (!state || !state.upgrades) return;
-  const nextLevel = normalizeLevel(level, 0);
+  const nextLevel = clampUpgradeLevelToConfig(key, normalizeLevel(level, 0));
   const entry = state.upgrades[key];
   if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
     entry.level = nextLevel;
@@ -197,9 +272,13 @@ function setUpgradeLevel(state, key, level) {
 
 window.getUpgradeLevel = getUpgradeLevel;
 window.setUpgradeLevel = setUpgradeLevel;
+window.clampUpgradeLevelToConfig = clampUpgradeLevelToConfig;
 
 window.UPGRADE_DEFAULTS = Object.fromEntries(
-  Object.entries(UPGRADE_CONFIG).map(([key, cfg]) => [key, { level: normalizeLevel(cfg.defaultLevel || 0) }])
+  Object.entries(UPGRADE_CONFIG).map(([key, cfg]) => [
+    key,
+    { level: clampUpgradeLevelToConfig(key, normalizeLevel(cfg.defaultLevel || 0)) },
+  ])
 );
 
 function previewAtk(state, level){
@@ -440,26 +519,53 @@ window.UPGRADE_INFO = [
   {
     key: 'petAi',
     title: '🧠 똑똑한 펫',
-    getLevel: (state) => getUpgradeLevel(state, 'petAi'),
-    getLevelLabel: (state) => `Lv ${getUpgradeLevel(state, 'petAi')}`,
+    getLevel: (state) => clampPetBehaviorLevel(getUpgradeLevel(state, 'petAi')),
+    getLevelLabel: (state) => {
+      const level = clampPetBehaviorLevel(getUpgradeLevel(state, 'petAi'));
+      const max = UPGRADE_CONFIG?.petAi?.maxLevel;
+      return Number.isFinite(max) && max > 0 ? `Lv ${level}/${max}` : `Lv ${level}`;
+    },
     getDescription: (state) => {
-      const level = getUpgradeLevel(state, 'petAi');
+      const level = clampPetBehaviorLevel(getUpgradeLevel(state, 'petAi'));
+      const max = UPGRADE_CONFIG?.petAi?.maxLevel;
+      const hasNext = !Number.isFinite(max) || level < max;
       const current = computePetBehaviorStats(level);
-      const next = computePetBehaviorStats(level + 1);
+      const next = hasNext ? computePetBehaviorStats(level + 1) : current;
       const formatSpeed = (value) => `${Math.round(value)}px/s`;
       const formatInterval = (value) => `${value.toFixed(2)}초`;
       const formatRadius = (value) => `${value.toFixed(1)}px`;
       const parts = [
-        `이동 속도: ${formatSpeed(current.moveSpeed)} → ${formatSpeed(next.moveSpeed)}`,
-        `공격 주기: ${formatInterval(current.atkInterval)} → ${formatInterval(next.atkInterval)}`,
-        `채굴 반경: ${formatRadius(current.swingRadius)} → ${formatRadius(next.swingRadius)}`,
+        hasNext
+          ? `이동 속도: ${formatSpeed(current.moveSpeed)} → ${formatSpeed(next.moveSpeed)}`
+          : `이동 속도: ${formatSpeed(current.moveSpeed)}`,
+        hasNext
+          ? `공격 주기: ${formatInterval(current.atkInterval)} → ${formatInterval(next.atkInterval)}`
+          : `공격 주기: ${formatInterval(current.atkInterval)}`,
+        hasNext
+          ? `채굴 반경: ${formatRadius(current.swingRadius)} → ${formatRadius(next.swingRadius)}`
+          : `채굴 반경: ${formatRadius(current.swingRadius)}`,
       ];
+      if (!hasNext) {
+        parts.push('최대 레벨에 도달했습니다.');
+      }
       return parts.join('<br>');
     },
     getCost: (state) => upgradeCostLinear(state, 'petAi'),
-    canBuy: () => true,
+    canBuy: (state) => {
+      const max = UPGRADE_CONFIG?.petAi?.maxLevel;
+      const level = clampPetBehaviorLevel(getUpgradeLevel(state, 'petAi'));
+      if (Number.isFinite(max) && level >= max) {
+        return `최대 레벨(${max}레벨)에 도달했습니다.`;
+      }
+      return true;
+    },
     onBuy: ({ state, applyPetBehaviorUpgrade }) => {
-      const next = getUpgradeLevel(state, 'petAi') + 1;
+      const current = clampPetBehaviorLevel(getUpgradeLevel(state, 'petAi'));
+      const max = UPGRADE_CONFIG?.petAi?.maxLevel;
+      const next = Number.isFinite(max) ? Math.min(current + 1, max) : current + 1;
+      if (Number.isFinite(max) && current >= max) {
+        return;
+      }
       setUpgradeLevel(state, 'petAi', next);
       if (typeof applyPetBehaviorUpgrade === 'function') {
         applyPetBehaviorUpgrade();
