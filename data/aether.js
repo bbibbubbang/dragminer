@@ -18,7 +18,7 @@ window.REBIRTH_PERK_DATA = [
     desc: '특별 펫 +1',
     base: 48,
     scale: 1.8,
-    max: 5,
+    max: 7,
     getLevel: (state) => state.aether.petPlus || 0,
     apply: ({ state }) => {
       state.aether.petPlus = (state.aether.petPlus || 0) + 1;
