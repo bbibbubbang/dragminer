@@ -986,6 +986,32 @@ section[id^="tab-"].active{ display:block; }
       return Math.floor(safeBase * multiplier);
     }
 
+    function rollOverCritTier(chance, baseMultiplier){
+      const safeChance = Number.isFinite(chance) ? chance : 0;
+      const safeBaseMult = Number.isFinite(baseMultiplier) ? baseMultiplier : 2;
+      let remaining = Math.max(0, safeChance);
+      let tier = 0;
+
+      while(remaining > 0){
+        const chunk = Math.min(remaining, 1);
+        if(chunk >= 0.999999){
+          tier += 1;
+          remaining = Math.max(0, remaining - 1);
+          continue;
+        }
+        if(Math.random() < chunk){
+          tier += 1;
+          remaining = Math.max(0, remaining - chunk);
+        } else {
+          break;
+        }
+      }
+
+      if(tier <= 0) return { tier: 0, multiplier: 1 };
+      const multiplier = safeBaseMult + Math.max(0, tier - 1);
+      return { tier, multiplier };
+    }
+
     const REBIRTH_COST_GROWTH = 1.2;
 
     function perkCost(p){
@@ -2586,16 +2612,32 @@ section[id^="tab-"].active{ display:block; }
       const dmgMul = Number.isFinite(opts?.damageMul) ? Math.max(0, opts.damageMul) : 1;
       let dmg = Math.round(atk * (state.skillAtkBuffUntil>performance.now()?2:1) * dmgMul);
       const canCrit = (source === 'tap' || source === 'pet');
-      const crit = canCrit && Math.random() < state.player.critChance;
-      if(crit) dmg = Math.floor(dmg * state.player.critMult);
+      const critInfo = canCrit
+        ? rollOverCritTier(state.player.critChance, state.player.critMult)
+        : { tier: 0, multiplier: 1 };
+      const isCrit = critInfo.tier > 0;
+      if(isCrit) dmg = Math.floor(dmg * critInfo.multiplier);
       ore.hp -= dmg;
       const alive = ore.hp > 0;
       if(!alive){ onOreBroken(idx, ore); renderTop(); }
       renderGrid();
       const cell = state.grid[idx]?.el;
       const canShowDamage = !state.settings || state.settings.showDamageNumbers !== false;
-      if(alive && cell && canShowDamage){ const dm = document.createElement('div'); dm.classList.add('dmg'); if(crit) dm.classList.add('crit'); dm.textContent = (crit?'CRIT ':'') + '-' + dmg; dm.style.left='50%'; dm.style.top='38%'; dm.style.transform='translateX(-50%)'; cell.appendChild(dm); setTimeout(()=>dm.remove(), 520); }
-      (crit?SFX.crit:SFX.hit)();
+      if(alive && cell && canShowDamage){
+        const dm = document.createElement('div');
+        dm.classList.add('dmg');
+        if(isCrit) dm.classList.add('crit');
+        const critLabel = isCrit
+          ? (critInfo.tier > 1 ? `CRIT${Math.round(critInfo.multiplier * 100)}%` : 'CRIT')
+          : '';
+        dm.textContent = (isCrit ? `${critLabel} ` : '') + '-' + dmg;
+        dm.style.left='50%';
+        dm.style.top='38%';
+        dm.style.transform='translateX(-50%)';
+        cell.appendChild(dm);
+        setTimeout(()=>dm.remove(), 520);
+      }
+      (isCrit?SFX.crit:SFX.hit)();
     }
 
     function onPointerDown(e){
