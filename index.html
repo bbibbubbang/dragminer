@@ -925,7 +925,11 @@ section[id^="tab-"].active{ display:block; }
           const saved = savedUpgrades[key];
           const lvl = typeof saved === 'number' ? saved
             : (saved && typeof saved.level === 'number' ? saved.level : def.level || 0);
-          state.upgrades[key] = { level: Math.max(0, lvl) };
+          const normalized = Math.max(0, lvl);
+          const clamped = typeof clampUpgradeLevelToConfig === 'function'
+            ? clampUpgradeLevelToConfig(key, normalized)
+            : normalized;
+          state.upgrades[key] = { level: clamped };
         }
         state.floor=s.floor||1; state.highestFloor=s.highestFloor||1;
         state.inventory=s.inventory||state.inventory;
@@ -1083,7 +1087,10 @@ section[id^="tab-"].active{ display:block; }
     const GRID_SAFE_MARGIN = 6;
 
     function applyPetBehaviorUpgrade(){
-      const level = getUpgradeLevel(state, 'petAi');
+      const rawLevel = getUpgradeLevel(state, 'petAi');
+      const level = typeof clampPetBehaviorLevel === 'function'
+        ? clampPetBehaviorLevel(rawLevel)
+        : rawLevel;
       let stats = null;
       if(typeof computePetBehaviorStats === 'function'){
         try {
