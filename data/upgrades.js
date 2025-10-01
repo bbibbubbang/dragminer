@@ -15,6 +15,28 @@ function spawnIntervalForLevel(level = 0) {
 
 window.spawnIntervalForLevel = spawnIntervalForLevel;
 
+const ETHER_SPAWN_SETTINGS = {
+  baseDelay: 15,
+  reductionPerLevel: 0.5,
+  maxLevel: 10,
+};
+
+function clampEtherSpawnLevel(level = 0) {
+  const lvl = Math.max(0, Math.floor(level));
+  if (Number.isFinite(ETHER_SPAWN_SETTINGS.maxLevel)) {
+    return Math.min(lvl, ETHER_SPAWN_SETTINGS.maxLevel);
+  }
+  return lvl;
+}
+
+function computeEtherSpawnReduction(level = 0) {
+  const clamped = clampEtherSpawnLevel(level);
+  return clamped * ETHER_SPAWN_SETTINGS.reductionPerLevel;
+}
+
+window.ETHER_SPAWN_SETTINGS = ETHER_SPAWN_SETTINGS;
+window.computeEtherSpawnReduction = computeEtherSpawnReduction;
+
 const ATK_GROWTH = {
   perLevel: 0.12,
   milestoneBonus: 0.35,
@@ -61,6 +83,12 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 650,
     costExponent: 1.18,
+  },
+  etherLocator: {
+    defaultLevel: 0,
+    baseCost: 300,
+    costExponent: 1.5,
+    maxLevel: 10,
   },
   refinery: {
     defaultLevel: 0,
@@ -306,6 +334,72 @@ window.UPGRADE_INFO = [
       const next = getUpgradeLevel(state, 'spawn') + 1;
       setUpgradeLevel(state, 'spawn', next);
       if (state.inRun) restartSpawnTimer();
+    },
+  },
+  {
+    key: 'etherLocator',
+    title: '📡 에테르 신호기',
+    getLevel: (state) => getUpgradeLevel(state, 'etherLocator'),
+    getLevelLabel: (state) => {
+      const level = getUpgradeLevel(state, 'etherLocator');
+      const max = UPGRADE_CONFIG.etherLocator?.maxLevel || 0;
+      return max ? `Lv ${level}/${max}` : `Lv ${level}`;
+    },
+    getDescription: (state) => {
+      const level = getUpgradeLevel(state, 'etherLocator');
+      const perkLevel = state?.aether?.etherHaste || 0;
+      const baseDelay = Number.isFinite(ETHER_SPAWN_SETTINGS.baseDelay)
+        ? ETHER_SPAWN_SETTINGS.baseDelay
+        : 15;
+      const perkReduction = computeEtherSpawnReduction(perkLevel);
+      const currentReduction = computeEtherSpawnReduction(level);
+      const nextReduction = computeEtherSpawnReduction(level + 1);
+      const totalCurrentReduction = Math.min(baseDelay, perkReduction + currentReduction);
+      const totalNextReduction = Math.min(baseDelay, perkReduction + nextReduction);
+      const currentDelay = Math.max(0, baseDelay - totalCurrentReduction);
+      const nextDelay = Math.max(0, baseDelay - totalNextReduction);
+      const delta = Math.max(0, currentDelay - nextDelay);
+      const formatSeconds = (value) => {
+        if (!Number.isFinite(value)) return '--';
+        const normalized = Math.max(0, value);
+        if (normalized === 0) return '0.0';
+        const decimals = Number.isInteger(normalized) ? 0 : 1;
+        return normalized.toFixed(decimals);
+      };
+      const formatReductionText = (value) => {
+        if (!Number.isFinite(value) || value <= 0) return '0초';
+        return `-${formatSeconds(value)}초`;
+      };
+      const deltaSuffix = delta > 0 ? ` (-${formatSeconds(delta)}초)` : '';
+      const mainLine = `현재 등장: ${formatSeconds(currentDelay)}초${deltaSuffix}`;
+      const detailLines = [];
+      if (perkReduction > 0) {
+        detailLines.push(`환생 보너스: ${formatReductionText(perkReduction)}`);
+      }
+      detailLines.push(`업그레이드 보너스: ${formatReductionText(currentReduction)}`);
+      if (!detailLines.length) {
+        return mainLine;
+      }
+      const detailHtml = detailLines
+        .map((line) => `<span style="opacity:.75">${line}</span>`)
+        .join('<br>');
+      return `${mainLine}<br>${detailHtml}`;
+    },
+    getCost: (state) => upgradeCostLinear(state, 'etherLocator'),
+    canBuy: (state) => {
+      const max = UPGRADE_CONFIG.etherLocator?.maxLevel || 0;
+      const level = getUpgradeLevel(state, 'etherLocator');
+      if (max && level >= max) {
+        return '이미 최대 레벨입니다.';
+      }
+      return true;
+    },
+    onBuy: ({ state, renderAether }) => {
+      const next = getUpgradeLevel(state, 'etherLocator') + 1;
+      setUpgradeLevel(state, 'etherLocator', next);
+      if (typeof renderAether === 'function') {
+        renderAether();
+      }
     },
   },
   {
