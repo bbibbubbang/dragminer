@@ -1761,6 +1761,33 @@ section[id^="tab-"].active{ display:block; }
       setTimeout(()=>echo.remove(), 260);
     }
 
+    function spawnMeteorTrail(startX, startY, endX, endY, meteorSize, travelDuration, meteorEl){
+      if(!gridFxLayerEl) return;
+      const dx = endX - startX;
+      const dy = endY - startY;
+      const distance = Math.hypot(dx, dy);
+      if(distance <= 0.5) return;
+      const angle = Math.atan2(dy, dx);
+      const trail = document.createElement('div');
+      trail.className = 'meteor-trail';
+      trail.style.left = startX + 'px';
+      trail.style.top = startY + 'px';
+      trail.style.transform = `translate(0px, -50%) rotate(${angle}rad)`;
+      const extra = Number.isFinite(meteorSize) ? Math.max(12, meteorSize * 0.66) : 28;
+      trail.style.setProperty('--meteor-trail-length', `${distance + extra}px`);
+      const life = Number.isFinite(travelDuration) ? Math.max(0.45, travelDuration + 0.25) : null;
+      if(life !== null){
+        trail.style.setProperty('--meteor-trail-life', `${life}s`);
+      }
+      const ttl = life !== null ? Math.ceil((life + 0.12) * 1000) : 900;
+      setTimeout(()=>trail.remove(), ttl);
+      if(meteorEl && meteorEl.parentNode === gridFxLayerEl){
+        gridFxLayerEl.insertBefore(trail, meteorEl);
+      } else {
+        gridFxLayerEl.appendChild(trail);
+      }
+    }
+
     function spawnMeteorSkillEffect(onImpact){
       if(!gridFxLayerEl || !gridEl){
         if(typeof onImpact === 'function') onImpact();
@@ -1787,6 +1814,7 @@ section[id^="tab-"].active{ display:block; }
       meteor.style.setProperty('--meteor-travel-duration', `${travelDuration}s`);
       meteor.style.transform = `translate(${startX - half}px, ${startY - half}px) rotate(${angle}rad) scale(0.45)`;
       gridFxLayerEl.appendChild(meteor);
+      spawnMeteorTrail(startX, startY, centerX, centerY, size, travelDuration, meteor);
       spawnMeteorEcho(startX, startY, size, meteor);
       let impacted = false;
       const travelMs = travelDuration * 1000;
