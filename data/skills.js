@@ -37,9 +37,9 @@ window.ACTIVE_SKILL_DATA = [
   {
     key:'sonic',
     name:'초음파',
-    desc:'가까운 광석에 즉시 큰 피해',
+    desc:'에테르 광석 중심으로 5연속 충격파',
     ae:130,
-    cd:15,
+    cd:10,
     autoToggleKey:'autoSonic',
     autoToggleLabel:'자동 사용',
   },
