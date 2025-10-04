@@ -93,7 +93,7 @@
     /* Skills */
     .skillshop{display:grid;grid-template-columns:1fr;gap:10px}
     .skill-card{background:#0f1430;border:1px solid #273061;border-radius:12px;padding:10px}
-    .skill-card.owned-active{opacity:0.45}
+    .skill-card.owned-active,.skill-card.owned-passive{opacity:0.45}
     .skillbar{position:sticky;bottom:0;margin-top:8px;background:#0e1328;border:1px solid #1f2853;border-radius:12px;padding:6px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
     @property --skill-ring-angle{syntax:'<angle>';inherits:false;initial-value:0deg}
     @keyframes skill-ring-spin{to{--skill-ring-angle:-360deg}}
@@ -1880,14 +1880,39 @@ section[id^="tab-"].active{ display:block; }
           const content = lines.join('<br>');
           extra = `<div class="mono" style="margin:0 0 6px 0">${content}</div>`;
         }
-        row.innerHTML = header + desc + extra +
-                         `<div class="row" style="justify-content:space-between;margin-top:6px">
-                           <div class="mono">비용 ${cost} 에테르</div>
-                           <label class="row" style="gap:6px;align-items:center">
-                             <input type="checkbox" ${checked?'checked':''} ${maxed?'disabled':''} data-perk="${p.key}">
-                             <span>${maxed?'최대':''}선택</span>
-                           </label>
-                         </div>`;
+        if(maxed && rebirthPick[p.key]){
+          delete rebirthPick[p.key];
+        }
+        row.innerHTML = header + desc + extra;
+        const footer = document.createElement('div');
+        footer.className = 'row';
+        footer.style.justifyContent = 'space-between';
+        footer.style.marginTop = '6px';
+        const priceLabel = document.createElement('div');
+        priceLabel.className = 'mono';
+        priceLabel.textContent = maxed ? '비용 -- 에테르' : `비용 ${cost} 에테르`;
+        footer.appendChild(priceLabel);
+        if(maxed){
+          const maxLabel = document.createElement('div');
+          maxLabel.className = 'mono';
+          maxLabel.textContent = '최대 레벨';
+          footer.appendChild(maxLabel);
+        } else {
+          const label = document.createElement('label');
+          label.className = 'row';
+          label.style.gap = '6px';
+          label.style.alignItems = 'center';
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.dataset.perk = p.key;
+          input.checked = checked;
+          label.appendChild(input);
+          const span = document.createElement('span');
+          span.textContent = '선택';
+          label.appendChild(span);
+          footer.appendChild(label);
+        }
+        row.appendChild(footer);
         list.appendChild(row);
         if(checked && !maxed){ total += cost; }
       }
@@ -2023,6 +2048,7 @@ section[id^="tab-"].active{ display:block; }
         const levelLabel = `Lv ${displayLevel}/${maxLevel}`;
         const statLine = buildPassiveStatLine(sk, displayLevel, isMaxed);
         const card = document.createElement('div'); card.className = 'skill-card';
+        if(isMaxed){ card.classList.add('owned-passive'); }
         const descBlock = sk.desc ? `<div class="mono" style="opacity:.8;margin:4px 0 ${statLine?4:8}px 0">${sk.desc}</div>` : '';
         const statBlock = statLine ? `<div class="mono" style="margin:0 0 8px 0">${statLine}</div>` : '';
         const priceValue = isMaxed ? '--' : getPassiveSkillCost(sk, ownedCount);
