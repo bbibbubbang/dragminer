@@ -1763,7 +1763,8 @@ section[id^="tab-"].active{ display:block; }
       trail.className = 'meteor-trail';
       trail.style.left = `${startX}px`;
       trail.style.top = `${startY}px`;
-      trail.style.transform = `translateY(-50%) rotate(${angle}rad)`;
+      const baseTrailTransform = `translateY(-50%) rotate(${angle}rad)`;
+      trail.style.transform = `${baseTrailTransform} scaleX(0)`;
       trail.style.setProperty('--meteor-trail-length', `${Math.max(distance + size * 0.6, 80)}px`);
       trail.style.setProperty('--meteor-trail-life', `${trailLife}s`);
       trail.style.setProperty('--meteor-travel-duration', `${travelDuration}s`);
@@ -1775,6 +1776,7 @@ section[id^="tab-"].active{ display:block; }
       const impactNow = () => {
         if(impacted) return;
         impacted = true;
+        trail.style.transform = `${baseTrailTransform} scaleX(1)`;
         meteor.classList.add('fading');
         triggerMeteorImpact(centerX, centerY, onImpact);
         setTimeout(()=>meteor.remove(), 360);
@@ -1783,6 +1785,7 @@ section[id^="tab-"].active{ display:block; }
       requestAnimationFrame(()=>{
         requestAnimationFrame(()=>{
           meteor.addEventListener('transitionend', impactNow, { once: true });
+          trail.style.transform = `${baseTrailTransform} scaleX(1)`;
           meteor.style.transform = `translate(${centerX - half}px, ${centerY - half}px) rotate(${angle}rad) scale(1.18)`;
         });
       });
@@ -2557,13 +2560,13 @@ section[id^="tab-"].active{ display:block; }
           const center = cellCenter(etherIdx);
           const pulseCount = 5;
           const interval = 140;
-          const radius = ORE_RADIUS * 2;
+          const radius = ORE_RADIUS * 4;
           const atk = calcAtk();
           const dmgPerPulse = Math.max(4, Math.round(atk * 2));
           for(let i=0;i<pulseCount;i++){
             setTimeout(()=>{
               if(!state.inRun) return;
-              spawnSonicRing(center.x, center.y, 2);
+              spawnSonicRing(center.x, center.y, 4);
               applySonicPulseDamage(center.x, center.y, radius, dmgPerPulse);
             }, i * interval);
           }
