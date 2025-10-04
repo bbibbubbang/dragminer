@@ -71,7 +71,7 @@ const UPGRADE_CONFIG = {
     defaultLevel: 0,
     baseCost: 240,
     costExponent: 1.15,
-    maxLevel: 34,
+    maxLevel: 37,
   },
   pet: {
     defaultLevel: 0,

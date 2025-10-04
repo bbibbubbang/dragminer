@@ -36,11 +36,22 @@
     #tab-dungeon{flex:1;display:flex;flex-direction:column;overflow:hidden}
     .grid-wrap{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
     .grid{position:relative;background:#0e1328;padding:6px;border-radius:16px;border:1px solid #202a51;touch-action: none;flex:1}
+    .grid-fx-layer{position:absolute;pointer-events:none;width:0;height:0;z-index:5;transform:translate3d(0,0,0);overflow:visible;}
     .ore{position:absolute;width:52px;height:52px;display:flex;align-items:center;justify-content:center;}
     .ore .name{display:none}
     .ore .hp{z-index:3}
     .hp{position:absolute;top:6px;left:6px;right:6px;height:8px;background:rgba(0,0,0,.35);border-radius:999px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .hp>div{height:100%;background:linear-gradient(90deg,#34d399,#f59e0b);width:100%}
+
+    .meteor-effect{position:absolute;width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(254,243,199,.95) 0%,rgba(253,186,116,.9) 32%,rgba(249,115,22,.85) 64%,rgba(124,45,18,.65) 100%);box-shadow:0 0 14px rgba(249,115,22,.7);transform-origin:center;opacity:.95;transition:transform .8s cubic-bezier(.22,.72,.23,1),opacity .3s ease-out;}
+    .meteor-effect.fading{opacity:0;}
+    .meteor-burst{position:absolute;width:48px;height:48px;border-radius:50%;background:radial-gradient(circle,rgba(254,243,199,.9) 0%,rgba(253,186,116,.5) 45%,rgba(249,115,22,0) 75%);transform:translate(-50%,-50%) scale(.6);opacity:.9;animation:meteor-burst .4s ease-out forwards;}
+    @keyframes meteor-burst{to{transform:translate(-50%,-50%) scale(1.6);opacity:0;}}
+    .meteor-fragment{position:absolute;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(254,243,199,.95) 0%,rgba(249,115,22,.85) 60%,rgba(124,45,18,.75) 100%);box-shadow:0 0 8px rgba(249,115,22,.55);transform:translate(-50%,-50%) scale(.4);opacity:0;animation:meteor-fragment .6s ease-out forwards;}
+    .meteor-fragment::after{content:'';position:absolute;inset:20%;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.8) 0%,rgba(255,255,255,0) 70%);opacity:.8;}
+    @keyframes meteor-fragment{0%{opacity:1;transform:translate(-50%,-50%) scale(.55);}100%{opacity:0;transform:translate(calc(-50% + var(--fx-dx,0px)),calc(-50% + var(--fx-dy,0px))) scale(.25);}}
+    .sonic-ring{position:absolute;width:52px;height:52px;border:2px solid rgba(255,255,255,.9);border-radius:50%;box-shadow:0 0 12px rgba(255,255,255,.35);transform:translate(-50%,-50%) scale(.25);opacity:.8;animation:sonic-ring .28s ease-out forwards;}
+    @keyframes sonic-ring{to{transform:translate(-50%,-50%) scale(var(--ring-scale,2));opacity:0;}}
 
     .ore-shape{position:absolute;inset:0;border-radius:16px;--ore-clip:inset(0% round 16px);clip-path:var(--ore-clip);transition:transform .16s ease,filter .16s ease;transform:scale(1);}
     .ore-shape::before,.ore-shape::after{content:'';position:absolute;inset:0;clip-path:var(--ore-clip);pointer-events:none;}
@@ -184,6 +195,7 @@ section[id^="tab-"].active{ display:block; }
         </div>
         <div class="grid-wrap">
           <div id="grid" class="grid"></div>
+          <div id="gridFxLayer" class="grid-fx-layer"></div>
           <div id="skillBar" class="skillbar" style="display:none"></div>
         </div>
       </section>
@@ -1069,6 +1081,8 @@ section[id^="tab-"].active{ display:block; }
 
     const $ = sel => document.querySelector(sel);
     const gridEl = $('#grid');
+    const gridWrapEl = document.querySelector('#tab-dungeon .grid-wrap');
+    const gridFxLayerEl = $('#gridFxLayer');
     const skillBarEl = $('#skillBar');
     const screenEl = $('.screen');
     const aeGainFlashEl = $('#aeGainFlash');
@@ -1655,6 +1669,144 @@ section[id^="tab-"].active{ display:block; }
       document.body.classList.toggle('lock-v', isDungeonVisible);
     }
 
+    function syncFxLayerBounds(){
+      if(!gridFxLayerEl || !gridWrapEl || !gridEl) return;
+      const gridBox = gridEl.getBoundingClientRect();
+      const wrapBox = gridWrapEl.getBoundingClientRect();
+      if(!gridBox || !wrapBox) return;
+      const width = Math.max(0, gridBox.width);
+      const height = Math.max(0, gridBox.height);
+      gridFxLayerEl.style.width = width + 'px';
+      gridFxLayerEl.style.height = height + 'px';
+      gridFxLayerEl.style.left = (gridBox.left - wrapBox.left) + 'px';
+      gridFxLayerEl.style.top = (gridBox.top - wrapBox.top) + 'px';
+    }
+
+    function spawnMeteorFragments(cx, cy, count){
+      if(!gridFxLayerEl) return;
+      const pieces = Math.max(4, Math.floor(count));
+      for(let i=0;i<pieces;i++){
+        const frag = document.createElement('div');
+        frag.className = 'meteor-fragment';
+        frag.style.left = cx + 'px';
+        frag.style.top = cy + 'px';
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 40 + Math.random() * 44;
+        frag.style.setProperty('--fx-dx', `${Math.cos(angle) * distance}px`);
+        frag.style.setProperty('--fx-dy', `${Math.sin(angle) * distance}px`);
+        gridFxLayerEl.appendChild(frag);
+        setTimeout(()=>frag.remove(), 640);
+      }
+    }
+
+    function triggerMeteorImpact(cx, cy, onImpact){
+      if(gridFxLayerEl){
+        const burst = document.createElement('div');
+        burst.className = 'meteor-burst';
+        burst.style.left = cx + 'px';
+        burst.style.top = cy + 'px';
+        gridFxLayerEl.appendChild(burst);
+        setTimeout(()=>burst.remove(), 420);
+        spawnMeteorFragments(cx, cy, 12);
+      }
+      if(typeof onImpact === 'function'){
+        onImpact();
+      }
+    }
+
+    function spawnMeteorSkillEffect(onImpact){
+      if(!gridFxLayerEl || !gridEl){
+        if(typeof onImpact === 'function') onImpact();
+        return;
+      }
+      syncFxLayerBounds();
+      const gr = gridRect();
+      const width = Math.max(0, (gr.innerWidth ?? gr.width) || 0);
+      const height = Math.max(0, (gr.innerHeight ?? gr.height) || 0);
+      const startX = Math.max(gridSafeMargin.x + 8, ORE_RADIUS * 0.6);
+      const startY = Math.max(gridSafeMargin.y + 8, ORE_RADIUS * 0.6);
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const meteor = document.createElement('div');
+      meteor.className = 'meteor-effect';
+      const size = 36;
+      const half = size / 2;
+      meteor.style.transform = `translate(${startX - half}px, ${startY - half}px) scale(0.25)`;
+      gridFxLayerEl.appendChild(meteor);
+      let impacted = false;
+      const impactNow = () => {
+        if(impacted) return;
+        impacted = true;
+        meteor.classList.add('fading');
+        triggerMeteorImpact(centerX, centerY, onImpact);
+        setTimeout(()=>meteor.remove(), 320);
+      };
+      requestAnimationFrame(()=>{
+        requestAnimationFrame(()=>{
+          meteor.addEventListener('transitionend', impactNow, { once: true });
+          meteor.style.transform = `translate(${centerX - half}px, ${centerY - half}px) scale(1.4)`;
+        });
+      });
+      setTimeout(impactNow, 900);
+    }
+
+    function spawnSonicRing(cx, cy, scale){
+      if(!gridFxLayerEl) return;
+      syncFxLayerBounds();
+      const ring = document.createElement('div');
+      ring.className = 'sonic-ring';
+      ring.style.left = cx + 'px';
+      ring.style.top = cy + 'px';
+      if(Number.isFinite(scale)){
+        ring.style.setProperty('--ring-scale', String(scale));
+      }
+      gridFxLayerEl.appendChild(ring);
+      setTimeout(()=>ring.remove(), 360);
+    }
+
+    function applyMeteorImpactDamage(){
+      if(!state.inRun) return;
+      let touched = false;
+      let broke = false;
+      for(let i=0;i<25;i++){
+        const ore = state.grid[i];
+        if(!ore) continue;
+        touched = true;
+        const dmg = Math.max(10, Math.floor(ore.maxHp * 0.35));
+        ore.hp -= dmg;
+        if(ore.hp <= 0){
+          onOreBroken(i, ore);
+          broke = true;
+        }
+      }
+      if(touched){
+        renderGrid();
+        if(!broke) renderTop();
+      }
+    }
+
+    function applySonicPulseDamage(cx, cy, radius, damage){
+      if(!state.inRun) return;
+      let touched = false;
+      let broke = false;
+      for(let i=0;i<25;i++){
+        const ore = state.grid[i];
+        if(!ore) continue;
+        const dist = Math.hypot(ore.x - cx, ore.y - cy);
+        if(dist > radius) continue;
+        touched = true;
+        ore.hp -= damage;
+        if(ore.hp <= 0){
+          onOreBroken(i, ore);
+          broke = true;
+        }
+      }
+      if(touched){
+        renderGrid();
+        if(!broke) renderTop();
+      }
+    }
+
     function renderGrid(){ gridEl.innerHTML='';
       const gr = gridRect();
       const margins = currentGridMargins();
@@ -1716,7 +1868,8 @@ section[id^="tab-"].active{ display:block; }
         gridEl.appendChild(el);
         ore.el = el;
       }
-      renderPets(); }
+      renderPets();
+      syncFxLayerBounds(); }
 
     function renderInventory(){ const box=$('#inventoryList'); box.innerHTML='';
       const chk = document.getElementById('autoSellChkInv'); if(chk){ chk.checked = !!state.settings.autoSell; chk.onchange = ()=>{ state.settings.autoSell = !!chk.checked; save(); toast(`자동판매 ${chk.checked?'ON':'OFF'}`); }; }
@@ -2254,6 +2407,9 @@ section[id^="tab-"].active{ display:block; }
       timewarp: {
         shouldUse: () => state.timeLeft <= AUTO_TIMEWARP_THRESHOLD,
       },
+      sonic: {
+        shouldUse: () => state.grid.some(o => o && o.type === 'EtherOre'),
+      },
     };
 
     function maybeHandleAutoBerserk(){
@@ -2334,9 +2490,13 @@ section[id^="tab-"].active{ display:block; }
           break;
         }
         case 'timewarp': addRunTime(3); SFX.skill(); break;
-        case 'meteor':
-          for(let i=0;i<25;i++){ const o=state.grid[i]; if(!o) continue; const dmg = Math.max(10, Math.floor(o.maxHp*0.35)); o.hp -= dmg; if(o.hp<=0){ onOreBroken(i, o); } }
-          SFX.skill(); break;
+        case 'meteor': {
+          spawnMeteorSkillEffect(()=>{
+            applyMeteorImpactDamage();
+          });
+          SFX.skill();
+          break;
+        }
         case 'haste': {
           state.skillHasteUntil = performance.now()+5000;
           state.runFlags = state.runFlags || {};
@@ -2345,19 +2505,37 @@ section[id^="tab-"].active{ display:block; }
           SFX.skill();
           break;
         }
-        case 'sonic':
+        case 'sonic': {
           const gr = gridRect();
           const cx = Math.max(0, (gr.innerWidth ?? gr.width) || 0) / 2;
           const cy = Math.max(0, (gr.innerHeight ?? gr.height) || 0) / 2;
-          const idx = findNearestOreIdx(cx,cy);
-          if(idx>=0){
-            const o=state.grid[idx];
-            const atk = calcAtk();
-            const dmg = Math.max(20, Math.round(atk*10));
-            o.hp-=dmg;
-            if(o.hp<=0){ onOreBroken(idx, o); }
+          let targetIdx = state.grid.findIndex(o => o && o.type === 'EtherOre');
+          if(targetIdx < 0){
+            targetIdx = findNearestOreIdx(cx, cy);
           }
-          SFX.skill(); break;
+          if(targetIdx < 0){
+            used = false;
+            SFX.deny();
+            return;
+          }
+          const target = state.grid[targetIdx];
+          if(!target){ used = false; return; }
+          const center = cellCenter(targetIdx);
+          const pulseCount = 5;
+          const interval = 140;
+          const radius = ORE_RADIUS * 2;
+          const atk = calcAtk();
+          const dmgPerPulse = Math.max(4, Math.round(atk * 2));
+          for(let i=0;i<pulseCount;i++){
+            setTimeout(()=>{
+              if(!state.inRun) return;
+              spawnSonicRing(center.x, center.y, 2);
+              applySonicPulseDamage(center.x, center.y, radius, dmgPerPulse);
+            }, i * interval);
+          }
+          SFX.skill();
+          break;
+        }
         default: used = false;
       }
       if(!used) return;
@@ -2635,7 +2813,7 @@ section[id^="tab-"].active{ display:block; }
       }
       state.loot[ore.type] = (state.loot[ore.type]||0)+1;
       state.grid[idx] = null;
-      addRunTime(0.1);
+      addRunTime(0.25);
       SFX.break();
       renderTop();
     }
