@@ -1039,7 +1039,7 @@ section[id^="tab-"].active{ display:block; }
       return { tier, multiplier };
     }
 
-    const REBIRTH_COST_GROWTH = 1.2;
+    const REBIRTH_COST_GROWTH = 1.25;
 
     function perkCost(p){
       if(!p) return 0;
@@ -2910,8 +2910,10 @@ section[id^="tab-"].active{ display:block; }
 
     function onOreBroken(idx, ore){
       if(ore.type==='EtherOre'){
-        state.player.ether += 10;
-        flashAetherGain(10);
+        const clearedFloor = Math.max(0, Number.isFinite(state.floor) ? Math.floor(state.floor) : 0);
+        const gain = 10 + clearedFloor;
+        state.player.ether += gain;
+        flashAetherGain(gain);
         state.grid[idx] = null;
         SFX.break();
         bankAndExit(true);
