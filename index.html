@@ -44,6 +44,8 @@
     .hp>div{height:100%;background:linear-gradient(90deg,#34d399,#f59e0b);width:100%}
 
     .meteor-effect{position:absolute;width:42px;height:42px;clip-path:polygon(18% 4%,82% 0%,100% 32%,76% 56%,88% 86%,46% 100%,12% 82%,0% 38%);background:radial-gradient(circle at 32% 28%,rgba(255,237,205,.92) 0%,rgba(255,163,120,.9) 38%,rgba(214,59,32,.9) 68%,rgba(94,18,8,.78) 100%);filter:drop-shadow(0 0 22px rgba(255,106,64,.68)) drop-shadow(0 0 46px rgba(219,54,24,.45));transform-origin:center;opacity:.96;transition:transform var(--meteor-travel-duration,0.8s) linear,opacity .28s ease-out;animation:meteor-core-pulse .52s linear infinite alternate;pointer-events:none;mix-blend-mode:screen;z-index:6;}
+    .meteor-tracer{position:absolute;width:var(--meteor-tracer-size,42px);height:var(--meteor-tracer-size,42px);clip-path:polygon(50% 6%,93% 38%,76% 94%,24% 94%,7% 38%);background:radial-gradient(circle,rgba(255,76,76,.36) 0%,rgba(157,24,24,.28) 58%,rgba(118,18,18,0) 100%);border:1px solid rgba(255,92,92,.32);border-radius:12%;transform:translate(-50%,-50%) rotate(var(--meteor-tracer-rotation,0deg)) scale(1);opacity:.7;pointer-events:none;mix-blend-mode:screen;transition:opacity .22s ease-out,transform .22s ease-out;z-index:4;}
+    .meteor-tracer.fade{opacity:0;transform:translate(-50%,-50%) rotate(var(--meteor-tracer-rotation,0deg)) scale(.72);}
     .meteor-echo{position:absolute;width:var(--meteor-echo-size,42px);height:var(--meteor-echo-size,42px);clip-path:polygon(50% 4%,95% 38%,78% 96%,22% 96%,5% 38%);background:radial-gradient(circle,rgba(255,72,72,.34) 0%,rgba(145,16,16,.28) 68%,rgba(115,12,12,0) 100%);border:1px solid rgba(255,116,116,.48);border-radius:50%;pointer-events:none;opacity:.55;mix-blend-mode:screen;transform-origin:center;transition:opacity .22s ease-out,transform .22s ease-out;z-index:5;}
     .meteor-effect::before{content:'';position:absolute;inset:-18% 20% -42% 10%;background:linear-gradient(180deg,rgba(255,198,142,.65) 0%,rgba(255,134,76,.35) 55%,rgba(124,28,8,0) 100%);filter:blur(4px);opacity:.85;transform:rotate(-6deg);border-radius:50%;clip-path:inherit;}
     .meteor-effect::after{content:'';position:absolute;inset:14% -48% 12% 28%;background:radial-gradient(circle at 0% 50%,rgba(255,160,120,.85) 0%,rgba(255,118,72,.45) 40%,rgba(255,98,48,0) 75%);filter:blur(2px);opacity:.9;clip-path:inherit;}
@@ -1734,6 +1736,26 @@ section[id^="tab-"].active{ display:block; }
       }
     }
 
+    function spawnMeteorTracer(x, y, size, meteorEl){
+      if(!gridFxLayerEl) return;
+      const tracer = document.createElement('div');
+      tracer.className = 'meteor-tracer';
+      tracer.style.left = x + 'px';
+      tracer.style.top = y + 'px';
+      if(Number.isFinite(size)){
+        tracer.style.setProperty('--meteor-tracer-size', `${size}px`);
+      }
+      const rotation = (Math.random() * 360) - 180;
+      tracer.style.setProperty('--meteor-tracer-rotation', `${rotation}deg`);
+      if(meteorEl && meteorEl.parentNode === gridFxLayerEl){
+        gridFxLayerEl.insertBefore(tracer, meteorEl);
+      } else {
+        gridFxLayerEl.appendChild(tracer);
+      }
+      requestAnimationFrame(()=>tracer.classList.add('fade'));
+      setTimeout(()=>tracer.remove(), 320);
+    }
+
     function spawnMeteorEcho(x, y, size, meteorEl, options = {}){
       if(!gridFxLayerEl) return;
       const echo = document.createElement('div');
@@ -1795,15 +1817,46 @@ section[id^="tab-"].active{ display:block; }
       const dy = centerY - startY;
       const distance = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx);
-      const travelSpeed = 420;
+      const travelSpeed = 260;
       const travelDuration = Math.max(0.35, distance / travelSpeed);
       meteor.style.setProperty('--meteor-travel-duration', `${travelDuration}s`);
       meteor.style.transform = `translate(${startX - half}px, ${startY - half}px) rotate(${angle}rad) scale(0.45)`;
       gridFxLayerEl.appendChild(meteor);
       let impacted = false;
+      let trailActive = true;
+      let trailTimeoutId = null;
+      let trailStartTime = null;
+      const tracerIntervalMs = 72;
+      const stopTrail = () => {
+        trailActive = false;
+        if(trailTimeoutId !== null){
+          clearTimeout(trailTimeoutId);
+          trailTimeoutId = null;
+        }
+      };
+      const runTrail = () => {
+        if(!trailActive) return;
+        const now = performance.now();
+        if(trailStartTime === null){
+          trailStartTime = now;
+        }
+        const elapsed = (now - trailStartTime) / 1000;
+        const progress = travelDuration <= 0 ? 1 : Math.min(1, elapsed / travelDuration);
+        const trailX = startX + dx * progress;
+        const trailY = startY + dy * progress;
+        spawnMeteorTracer(trailX, trailY, size, meteor);
+        if(progress >= 1){
+          stopTrail();
+          return;
+        }
+        trailTimeoutId = setTimeout(runTrail, tracerIntervalMs);
+      };
+      spawnMeteorTracer(startX, startY, size, meteor);
       const impactNow = () => {
         if(impacted) return;
         impacted = true;
+        stopTrail();
+        spawnMeteorTracer(centerX, centerY, size, meteor);
         spawnMeteorEcho(centerX, centerY, size, meteor, { persist: true });
         meteor.classList.add('fading');
         triggerMeteorImpact(centerX, centerY, onImpact);
@@ -1813,6 +1866,8 @@ section[id^="tab-"].active{ display:block; }
         requestAnimationFrame(()=>{
           meteor.addEventListener('transitionend', impactNow, { once: true });
           meteor.style.transform = `translate(${centerX - half}px, ${centerY - half}px) rotate(${angle}rad) scale(1.18)`;
+          trailStartTime = performance.now();
+          runTrail();
         });
       });
       setTimeout(impactNow, (travelDuration + 0.25) * 1000);
