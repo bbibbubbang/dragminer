@@ -43,14 +43,12 @@
     .hp{position:absolute;top:6px;left:6px;right:6px;height:8px;background:rgba(0,0,0,.35);border-radius:999px;border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .hp>div{height:100%;background:linear-gradient(90deg,#34d399,#f59e0b);width:100%}
 
-    .meteor-effect{position:absolute;width:42px;height:42px;clip-path:polygon(18% 4%,82% 0%,100% 32%,76% 56%,88% 86%,46% 100%,12% 82%,0% 38%);background:radial-gradient(circle at 32% 28%,rgba(255,237,205,.92) 0%,rgba(255,163,120,.9) 38%,rgba(214,59,32,.9) 68%,rgba(94,18,8,.78) 100%);box-shadow:0 0 22px rgba(255,106,64,.68),0 0 46px rgba(219,54,24,.45);transform-origin:center;opacity:.96;transition:transform var(--meteor-travel-duration,0.8s) linear,opacity .28s ease-out;animation:meteor-core-pulse .52s linear infinite alternate;pointer-events:none;mix-blend-mode:screen;z-index:6;}
+    .meteor-effect{position:absolute;width:42px;height:42px;clip-path:polygon(18% 4%,82% 0%,100% 32%,76% 56%,88% 86%,46% 100%,12% 82%,0% 38%);background:radial-gradient(circle at 32% 28%,rgba(255,237,205,.92) 0%,rgba(255,163,120,.9) 38%,rgba(214,59,32,.9) 68%,rgba(94,18,8,.78) 100%);filter:drop-shadow(0 0 22px rgba(255,106,64,.68)) drop-shadow(0 0 46px rgba(219,54,24,.45));transform-origin:center;opacity:.96;transition:transform var(--meteor-travel-duration,0.8s) linear,opacity .28s ease-out;animation:meteor-core-pulse .52s linear infinite alternate;pointer-events:none;mix-blend-mode:screen;z-index:6;}
     .meteor-echo{position:absolute;width:var(--meteor-echo-size,42px);height:var(--meteor-echo-size,42px);clip-path:polygon(50% 4%,95% 38%,78% 96%,22% 96%,5% 38%);background:radial-gradient(circle,rgba(255,72,72,.34) 0%,rgba(145,16,16,.28) 68%,rgba(115,12,12,0) 100%);border:1px solid rgba(255,116,116,.48);border-radius:50%;pointer-events:none;opacity:.55;mix-blend-mode:screen;transform-origin:center;transition:opacity .22s ease-out,transform .22s ease-out;z-index:5;}
-    .meteor-effect::before{content:'';position:absolute;inset:-18% 20% -42% 10%;background:linear-gradient(180deg,rgba(255,198,142,.65) 0%,rgba(255,134,76,.35) 55%,rgba(124,28,8,0) 100%);filter:blur(4px);opacity:.85;transform:rotate(-6deg);border-radius:50%;}
-    .meteor-effect::after{content:'';position:absolute;inset:14% -48% 12% 28%;background:radial-gradient(circle at 0% 50%,rgba(255,160,120,.85) 0%,rgba(255,118,72,.45) 40%,rgba(255,98,48,0) 75%);filter:blur(2px);opacity:.9;}
+    .meteor-effect::before{content:'';position:absolute;inset:-18% 20% -42% 10%;background:linear-gradient(180deg,rgba(255,198,142,.65) 0%,rgba(255,134,76,.35) 55%,rgba(124,28,8,0) 100%);filter:blur(4px);opacity:.85;transform:rotate(-6deg);border-radius:50%;clip-path:inherit;}
+    .meteor-effect::after{content:'';position:absolute;inset:14% -48% 12% 28%;background:radial-gradient(circle at 0% 50%,rgba(255,160,120,.85) 0%,rgba(255,118,72,.45) 40%,rgba(255,98,48,0) 75%);filter:blur(2px);opacity:.9;clip-path:inherit;}
     .meteor-effect.fading{opacity:0;}
-    @keyframes meteor-core-pulse{from{filter:drop-shadow(0 0 18px rgba(255,124,78,.68));}to{filter:drop-shadow(0 0 26px rgba(255,74,44,.85));}}
-    .meteor-trail{position:absolute;height:28px;width:var(--meteor-trail-length,140px);border-radius:999px;background:linear-gradient(90deg,rgba(255,94,44,0) 0%,rgba(255,122,70,.38) 18%,rgba(255,108,58,.7) 52%,rgba(199,46,18,.45) 78%,rgba(120,18,12,0) 100%);filter:blur(1.2px) drop-shadow(0 0 16px rgba(255,104,48,.55));opacity:.78;transform-origin:0% 50%;pointer-events:none;mix-blend-mode:screen;animation:meteor-trail-fade var(--meteor-trail-life,.9s) ease-out forwards;}
-    @keyframes meteor-trail-fade{0%{opacity:.6;}40%{opacity:.95;}100%{opacity:0;filter:blur(6px);}}
+    @keyframes meteor-core-pulse{from{filter:drop-shadow(0 0 18px rgba(255,124,78,.68)) drop-shadow(0 0 40px rgba(219,54,24,.35));}to{filter:drop-shadow(0 0 26px rgba(255,74,44,.85)) drop-shadow(0 0 60px rgba(219,54,24,.45));}}
     .meteor-burst{position:absolute;width:72px;height:72px;border-radius:50%;background:radial-gradient(circle,rgba(255,237,205,.95) 0%,rgba(255,172,120,.65) 45%,rgba(255,106,68,.15) 74%,rgba(255,88,50,0) 100%);transform:translate(-50%,-50%) scale(.6);opacity:.95;animation:meteor-burst .48s ease-out forwards;mix-blend-mode:screen;box-shadow:0 0 28px rgba(255,134,86,.58),0 0 60px rgba(255,90,54,.32);}
     @keyframes meteor-burst{to{transform:translate(-50%,-50%) scale(2.1);opacity:0;filter:blur(16px);}}
     .meteor-flare{position:absolute;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,rgba(255,204,158,.85) 0%,rgba(255,121,70,.5) 40%,rgba(142,28,12,0) 70%);transform:translate(-50%,-50%) scale(.5);opacity:.9;animation:meteor-flare .52s ease-out forwards;pointer-events:none;mix-blend-mode:screen;}
@@ -1736,7 +1734,7 @@ section[id^="tab-"].active{ display:block; }
       }
     }
 
-    function spawnMeteorEcho(x, y, size, meteorEl){
+    function spawnMeteorEcho(x, y, size, meteorEl, options = {}){
       if(!gridFxLayerEl) return;
       const echo = document.createElement('div');
       echo.className = 'meteor-echo';
@@ -1752,39 +1750,27 @@ section[id^="tab-"].active{ display:block; }
       } else {
         gridFxLayerEl.appendChild(echo);
       }
+      const persist = options.persist === true;
+      const lifetime = Number.isFinite(options.lifetime) ? Math.max(0, options.lifetime) : (persist ? 1400 : 260);
       requestAnimationFrame(()=>{
         requestAnimationFrame(()=>{
-          echo.style.opacity = '0';
-          echo.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(0.72)`;
+          if(persist){
+            echo.style.opacity = '0.85';
+            echo.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(1.05)`;
+            if(lifetime > 320){
+              setTimeout(()=>{
+                echo.style.opacity = '0';
+                echo.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(0.82)`;
+              }, lifetime - 240);
+            }
+          } else {
+            echo.style.opacity = '0';
+            echo.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(0.72)`;
+          }
         });
       });
-      setTimeout(()=>echo.remove(), 260);
-    }
-
-    function spawnMeteorTrail(startX, startY, endX, endY, meteorSize, travelDuration, meteorEl){
-      if(!gridFxLayerEl) return;
-      const dx = endX - startX;
-      const dy = endY - startY;
-      const distance = Math.hypot(dx, dy);
-      if(distance <= 0.5) return;
-      const angle = Math.atan2(dy, dx);
-      const trail = document.createElement('div');
-      trail.className = 'meteor-trail';
-      trail.style.left = startX + 'px';
-      trail.style.top = startY + 'px';
-      trail.style.transform = `translate(0px, -50%) rotate(${angle}rad)`;
-      const extra = Number.isFinite(meteorSize) ? Math.max(12, meteorSize * 0.66) : 28;
-      trail.style.setProperty('--meteor-trail-length', `${distance + extra}px`);
-      const life = Number.isFinite(travelDuration) ? Math.max(0.45, travelDuration + 0.25) : null;
-      if(life !== null){
-        trail.style.setProperty('--meteor-trail-life', `${life}s`);
-      }
-      const ttl = life !== null ? Math.ceil((life + 0.12) * 1000) : 900;
-      setTimeout(()=>trail.remove(), ttl);
-      if(meteorEl && meteorEl.parentNode === gridFxLayerEl){
-        gridFxLayerEl.insertBefore(trail, meteorEl);
-      } else {
-        gridFxLayerEl.appendChild(trail);
+      if(lifetime !== Infinity){
+        setTimeout(()=>echo.remove(), lifetime);
       }
     }
 
@@ -1814,39 +1800,11 @@ section[id^="tab-"].active{ display:block; }
       meteor.style.setProperty('--meteor-travel-duration', `${travelDuration}s`);
       meteor.style.transform = `translate(${startX - half}px, ${startY - half}px) rotate(${angle}rad) scale(0.45)`;
       gridFxLayerEl.appendChild(meteor);
-      spawnMeteorTrail(startX, startY, centerX, centerY, size, travelDuration, meteor);
-      spawnMeteorEcho(startX, startY, size, meteor);
       let impacted = false;
-      const travelMs = travelDuration * 1000;
-      const echoInterval = 80;
-      let echoRaf = null;
-      let echoStartTime = null;
-      let lastEchoAt = -Infinity;
-      const runEcho = (now) => {
-        if(impacted) return;
-        if(echoStartTime === null){
-          echoStartTime = now;
-        }
-        const elapsed = now - echoStartTime;
-        const progress = Math.min(1, elapsed / travelMs);
-        if(elapsed - lastEchoAt >= echoInterval){
-          const echoX = startX + dx * progress;
-          const echoY = startY + dy * progress;
-          spawnMeteorEcho(echoX, echoY, size, meteor);
-          lastEchoAt = elapsed;
-        }
-        if(progress < 1){
-          echoRaf = requestAnimationFrame(runEcho);
-        }
-      };
       const impactNow = () => {
         if(impacted) return;
         impacted = true;
-        if(echoRaf !== null){
-          cancelAnimationFrame(echoRaf);
-          echoRaf = null;
-        }
-        spawnMeteorEcho(centerX, centerY, size, meteor);
+        spawnMeteorEcho(centerX, centerY, size, meteor, { persist: true });
         meteor.classList.add('fading');
         triggerMeteorImpact(centerX, centerY, onImpact);
         setTimeout(()=>meteor.remove(), 360);
@@ -1855,7 +1813,6 @@ section[id^="tab-"].active{ display:block; }
         requestAnimationFrame(()=>{
           meteor.addEventListener('transitionend', impactNow, { once: true });
           meteor.style.transform = `translate(${centerX - half}px, ${centerY - half}px) rotate(${angle}rad) scale(1.18)`;
-          echoRaf = requestAnimationFrame(runEcho);
         });
       });
       setTimeout(impactNow, (travelDuration + 0.25) * 1000);
