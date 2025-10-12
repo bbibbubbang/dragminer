@@ -3635,21 +3635,50 @@ function openTab(id){
     const h = document.querySelector('header');
     return h ? h.offsetHeight : 0;
   }
+  const navState = { knownGuard: 0, lastGuardSeen: 0 };
   function measure(){
-    const vw = window.innerWidth || document.documentElement.clientWidth || 360;
-    const vh = window.innerHeight || document.documentElement.clientHeight || 640;
-    const availH = Math.max(200, vh - headerH());
-    return Math.floor(Math.min(vw, availH));
+    const docEl = document.documentElement;
+    const vw = window.innerWidth || (docEl ? docEl.clientWidth : 360) || 360;
+    const baseVh = window.innerHeight || (docEl ? docEl.clientHeight : 640) || 640;
+    const candidates = [];
+    if (Number.isFinite(baseVh) && baseVh > 0) candidates.push(baseVh);
+    if (docEl && Number.isFinite(docEl.clientHeight) && docEl.clientHeight > 0) candidates.push(docEl.clientHeight);
+    let navGuardNow = 0;
+    const vv = window.visualViewport;
+    if (vv && Number.isFinite(vv.height)){
+      const offsetTop = Math.max(0, vv.offsetTop || 0);
+      const visualHeight = Math.max(0, Math.round(vv.height + offsetTop));
+      if (visualHeight > 0) candidates.push(visualHeight);
+      const navEstimate = Math.max(0, Math.round(baseVh - visualHeight));
+      if (navEstimate > navGuardNow) navGuardNow = navEstimate;
+    }
+    if (navGuardNow > navState.knownGuard) navState.knownGuard = navGuardNow;
+    const safeViewport = candidates.length ? Math.min.apply(Math, candidates) : baseVh;
+    const stableViewport = Math.max(0, Math.min(safeViewport, baseVh - navState.knownGuard));
+    const availH = Math.max(200, Math.max(0, stableViewport - headerH()));
+    return {
+      size: Math.floor(Math.min(vw, availH)),
+      navGuard: navGuardNow
+    };
   }
   let LOCK = 0;
   window.resizeDungeon = function(allowIncreaseOnly){
     if (!tabDungeon) return;
-    const size = measure();
+    const measurement = measure();
+    const size = measurement.size;
+    const navGuard = measurement.navGuard;
+    const navGuardDelta = navGuard - navState.lastGuardSeen;
     if (allowIncreaseOnly === true){
-      if (size > LOCK) LOCK = size;
+      if (navGuardDelta > 1){
+        LOCK = size;
+      } else if (size > LOCK) {
+        LOCK = size;
+      }
     } else {
-      LOCK = Math.max(LOCK, size);
+      LOCK = size;
     }
+    navState.lastGuardSeen = navGuard;
+    if (!LOCK) LOCK = size;
     const px = LOCK || size;
     const target = gridEl || tabDungeon;
     if (target){
@@ -3673,6 +3702,11 @@ function openTab(id){
     }));
   });
   window.addEventListener('resize', ()=> resizeDungeon(true), {passive:true});
+  if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function'){
+    const vv = window.visualViewport;
+    vv.addEventListener('resize', ()=> resizeDungeon(true), {passive:true});
+    vv.addEventListener('scroll', ()=> resizeDungeon(true), {passive:true});
+  }
 })();
 </script>
 
