@@ -1900,7 +1900,7 @@ section[id^="tab-"].active{ display:block; }
         const ore = state.grid[i];
         if(!ore) continue;
         touched = true;
-        const dmg = Math.max(10, Math.floor(ore.maxHp * 0.35));
+        const dmg = Math.max(10, Math.floor(ore.maxHp * 0.30));
         ore.hp -= dmg;
         if(ore.hp <= 0){
           onOreBroken(i, ore);
@@ -2648,7 +2648,7 @@ section[id^="tab-"].active{ display:block; }
           const interval = 140;
           const radius = ORE_RADIUS * 4;
           const atk = calcAtk();
-          const dmgPerPulse = Math.max(4, Math.round(atk * 2));
+          const dmgPerPulse = Math.max(4, Math.round(atk * 10));
           for(let i=0;i<pulseCount;i++){
             setTimeout(()=>{
               if(!state.inRun) return;
