@@ -274,6 +274,7 @@ section[id^="tab-"].active{ display:block; }
           <button id="importBtn" class="btn secondary">불러오기</button>
           <button id="fullscreenBtn" class="btn secondary">전체화면</button>
           <button id="toggleSoundBtn" class="btn ghost">효과음: 켜짐</button>
+          <button id="toggleBgmBtn" class="btn ghost">배경음악: 켜짐</button>
           <button id="resetBtn" class="btn danger">초기화</button>
         </div>
         <div class="settings-card">
@@ -644,6 +645,8 @@ section[id^="tab-"].active{ display:block; }
 
     // ---------- Audio ----------
     let audioCtx = null, audioResumePromise = null, sfxEnabled = true;
+    const BGM_URL = 'sounds/Echoing Dream Cavern.mp3';
+    let bgmAudio = null;
     const AUDIO_UNLOCK_EVENTS = ['pointerdown','touchstart','mousedown','keydown'];
     const AUDIO_UNLOCK_OPTS = { passive:true };
     let audioUnlockBound = false;
@@ -688,6 +691,9 @@ section[id^="tab-"].active{ display:block; }
       if(!ensureAudio()) return;
       if(audioCtx?.state === 'running'){
         removeAudioUnlockListeners();
+      }
+      if(state?.settings?.bgmEnabled !== false){
+        startBgm();
       }
     }
     addAudioUnlockListeners();
@@ -779,6 +785,32 @@ section[id^="tab-"].active{ display:block; }
       }
       return false;
     }
+    function getBgmAudio(){
+      if(!bgmAudio){
+        bgmAudio = new Audio(BGM_URL);
+        bgmAudio.loop = true;
+        bgmAudio.preload = 'auto';
+        bgmAudio.volume = 0.5;
+      }
+      return bgmAudio;
+    }
+    async function startBgm(){
+      if(state?.settings?.bgmEnabled === false) return;
+      const audio = getBgmAudio();
+      if(!audio) return;
+      try{
+        if(audio.paused){
+          await audio.play();
+        }
+      }catch(err){
+        console.warn('BGM play failed', err);
+      }
+    }
+    function stopBgm(){
+      if(!bgmAudio) return;
+      bgmAudio.pause();
+      try{ bgmAudio.currentTime = 0; }catch(e){}
+    }
     const SFX = {
       async hit(){
         const played = await playOreHit(0.7);
@@ -843,7 +875,7 @@ section[id^="tab-"].active{ display:block; }
       runFlags: { berserkBoostActive:false, berserkBoostPrevExpiry:null, hasteActive:false },
 
       // Settings
-      settings: { autoSell:false, showDamageNumbers:true, sfxEnabled:true },
+      settings: { autoSell:false, showDamageNumbers:true, sfxEnabled:true, bgmEnabled:true },
 
       lastTickReal: 0,
       visibilityPauseTs: 0,
@@ -871,12 +903,13 @@ section[id^="tab-"].active{ display:block; }
 
     function ensureSettingsDefaults(){
       if(!state.settings || typeof state.settings !== 'object' || Array.isArray(state.settings)){
-        state.settings = { autoSell:false, showDamageNumbers:true, sfxEnabled:true };
+        state.settings = { autoSell:false, showDamageNumbers:true, sfxEnabled:true, bgmEnabled:true };
         return;
       }
       if(typeof state.settings.autoSell !== 'boolean') state.settings.autoSell = false;
       if(typeof state.settings.showDamageNumbers !== 'boolean') state.settings.showDamageNumbers = true;
       if(typeof state.settings.sfxEnabled !== 'boolean') state.settings.sfxEnabled = true;
+      if(typeof state.settings.bgmEnabled !== 'boolean') state.settings.bgmEnabled = true;
     }
 
     function resetRunFlags(){
@@ -978,6 +1011,9 @@ section[id^="tab-"].active{ display:block; }
         state.settings = s.settings || state.settings;
         ensureSettingsDefaults();
         sfxEnabled = state.settings.sfxEnabled !== false;
+        if(state.settings.bgmEnabled !== false){
+          startBgm();
+        }
         ensurePassiveDefaults();
         ensureSkillAutoDefaults();
         resetRunFlags();
@@ -3356,6 +3392,7 @@ section[id^="tab-"].active{ display:block; }
     });
     $('#fullscreenBtn').addEventListener('click', ()=>{ SFX.ui(); if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); } else { document.exitFullscreen?.(); } });
     const toggleSoundBtn = document.getElementById('toggleSoundBtn');
+    const toggleBgmBtn = document.getElementById('toggleBgmBtn');
     function updateSoundToggleText(){
       if(!toggleSoundBtn) return;
       toggleSoundBtn.textContent = `효과음: ${sfxEnabled ? '켜짐' : '꺼짐'}`;
@@ -3367,6 +3404,28 @@ section[id^="tab-"].active{ display:block; }
         state.settings.sfxEnabled = sfxEnabled;
         if(sfxEnabled) ensureAudio();
         updateSoundToggleText();
+        save();
+      });
+    }
+
+    function updateBgmToggleText(){
+      if(!toggleBgmBtn) return;
+      const enabled = state.settings?.bgmEnabled !== false;
+      toggleBgmBtn.textContent = `배경음악: ${enabled ? '켜짐' : '꺼짐'}`;
+    }
+    if(toggleBgmBtn){
+      updateBgmToggleText();
+      toggleBgmBtn.addEventListener('click', ()=>{
+        SFX.ui();
+        const enabled = state.settings?.bgmEnabled !== false;
+        const next = !enabled;
+        state.settings.bgmEnabled = next;
+        if(next){
+          startBgm();
+        } else {
+          stopBgm();
+        }
+        updateBgmToggleText();
         save();
       });
     }
@@ -3499,7 +3558,9 @@ section[id^="tab-"].active{ display:block; }
     function boot(){
       load();
       updateSoundToggleText();
+      updateBgmToggleText();
       updateDamageToggleText();
+      startBgm();
       detectPlayGamesBridge();
       updatePlayGamesUI();
       refreshPlayGamesStatus();
