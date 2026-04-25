@@ -1,0 +1,24 @@
+Roblox Port Guide
+
+This folder contains the Lua translations of the HTML/JS web game structures for Roblox Studio.
+
+To integrate this into Roblox Studio, place the generated files into the corresponding locations in the Explorer panel:
+
+1. roblox/ReplicatedStorage/
+   - Move all `.lua` scripts from here to `ReplicatedStorage` in Roblox Studio.
+   - Example: ReplicatedStorage/Ores.lua, ReplicatedStorage/Skills.lua, ReplicatedStorage/Upgrades.lua
+   - These act as ModuleScripts so that both the Server and Client can share game data configurations.
+
+2. roblox/ServerScriptService/
+   - Move `.lua` scripts here to `ServerScriptService` in Roblox Studio.
+   - Example: ServerScriptService/MainServer.lua
+   - This script runs on the server and handles saving, loading, player stats initialization, and server-sided logic.
+
+3. roblox/StarterPlayer/StarterPlayerScripts/
+   - Move `.lua` scripts here to `StarterPlayer -> StarterPlayerScripts` in Roblox Studio.
+   - Example: StarterPlayerScripts/MainClient.lua
+   - This script runs locally for each player and handles input and UI updates.
+
+4. roblox/StarterGui/
+   - Any UI files (.rbxmx or .rbxm if exported later) or ScreenGuis should be placed here in Roblox Studio.
+   - You will need to recreate the HTML layout using ScreenGui, Frames, TextLabels, TextButtons, etc., inside StarterGui. The client scripts will look for these UI elements to update.
